@@ -1,0 +1,335 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "module description"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "description"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "Wuwei"
+    },
+    {
+      "name": "BelManagement",
+      "value": "Bluetooth management permission required"
+    },
+    {
+      "name": "UseBel",
+      "value": "Bluetooth usage permission required"
+    },
+    {
+      "name": "SearchBel",
+      "value": "Bluetooth scanning permission required"
+    },
+    {
+      "name": "UseLOCATION",
+      "value": "Location permission required to scan devices"
+    },
+    {
+      "name": "SearchLOCATION",
+      "value": "Permission required to scan devices"
+    },
+
+    {
+      "name": "auth_dialog_title",
+      "value": "Software Authorization"
+    },
+    {
+      "name": "auth_machine_code_label",
+      "value": "Machine Code: "
+    },
+    {
+      "name": "auth_copy",
+      "value": "Copy"
+    },
+    {
+      "name": "auth_register_placeholder",
+      "value": "Please enter registration code"
+    },
+
+    {
+      "name": "common_cancel",
+      "value": "Cancel"
+    },
+    {
+      "name": "common_confirm",
+      "value": "Confirm"
+    },
+    {
+      "name": "common_unknown",
+      "value": "Unknown"
+    },
+
+    {
+      "name": "home_title_main",
+      "value": "Wuwei Perimeter Alarm Service Software"
+    },
+    {
+      "name": "home_title_sub",
+      "value": "Wu Wei Perimeter Alarm Service Software"
+    },
+    {
+      "name": "home_version_text",
+      "value": "Version %s"
+    },
+
+    {
+      "name": "btn_serial_assistant",
+      "value": "Serial Test Assistant"
+    },
+    {
+      "name": "btn_monitor_test",
+      "value": "Test Jump Monitor"
+    },
+
+    {
+      "name": "btn_search_device",
+      "value": "Search Devices"
+    },
+    {
+      "name": "btn_stop_search",
+      "value": "Stop Searching"
+    },
+    {
+      "name": "label_sta_mode",
+      "value": "STA Mode"
+    },
+    {
+      "name": "label_tcp_mode",
+      "value": "TCP Mode"
+    },
+    {
+      "name": "label_connect_state",
+      "value": "Connection Status: "
+    },
+    {
+      "name": "label_search_progress",
+      "value": "Search Progress"
+    },
+
+    {
+      "name": "table_header_name",
+      "value": "Name"
+    },
+    {
+      "name": "table_header_address",
+      "value": "Address/ID"
+    },
+    {
+      "name": "table_header_status",
+      "value": "Status"
+    },
+    {
+      "name": "table_header_signal",
+      "value": "Signal"
+    },
+
+    {
+      "name": "list_empty_searching",
+      "value": "Searching for nearby devices..."
+    },
+    {
+      "name": "list_empty_no_device",
+      "value": "No devices found. Click \"Search Devices\" to start."
+    },
+
+    {
+      "name": "home_intro_line",
+      "value": "Perimeter Protection · Fiber Fence · Vibration Cable · Microwave Detection"
+    },
+    {
+      "name": "home_company_address",
+      "value": "Address: Room 2305, Tower 1, Wanda Plaza, No.93 Jianguo Road, Chaoyang District, Beijing"
+    },
+    {
+      "name": "home_company_phone",
+      "value": "Phone: +86-10-85987525/6"
+    },
+    {
+      "name": "home_company_website",
+      "value": "www.rodashine.com.cn"
+    },
+    {
+      "name": "home_search_tip_idle",
+      "value": "Tap \"Search Devices\" to start scanning"
+    },
+    {
+      "name": "connect_state_disconnected",
+      "value": "Disconnected"
+    },
+    {
+      "name": "home_search_tip_connect_success",
+      "value": "Bluetooth device connected, discovering services..."
+    },
+    {
+      "name": "home_search_tip_notify_failed",
+      "value": "Bluetooth service is ready, but notification channel failed to open. Please reconnect the device."
+    },
+    {
+      "name": "home_search_tip_detecting_device",
+      "value": "Bluetooth service is ready, detecting device type..."
+    },
+    {
+      "name": "home_search_tip_detect_success_fmt",
+      "value": "Device type detected: %s"
+    },
+    {
+      "name": "home_search_tip_detect_unknown",
+      "value": "Failed to detect device type, treating as unknown device."
+    },
+    {
+      "name": "home_search_tip_discover_failed",
+      "value": "Service discovery failed, please check the device."
+    },
+    {
+      "name": "home_search_tip_disconnected",
+      "value": "Device disconnected."
+    },
+    {
+      "name": "connect_state_connected_fmt",
+      "value": "Connected: %s"
+    },
+    {
+      "name": "connect_state_connecting_fmt",
+      "value": "Connecting: %s"
+    },
+    {
+      "name": "connect_state_disconnecting_fmt",
+      "value": "Disconnecting: %s"
+    },
+    {
+      "name": "home_error_context_not_ready",
+      "value": "Internal error: context not ready."
+    },
+    {
+      "name": "license_warn_left_runs",
+      "value": "Current license remaining about %d uses, please renew in time."
+    },
+    {
+      "name": "license_warn_left_days",
+      "value": "Current license validity about %d days remaining, please renew in time."
+    },
+    {
+      "name": "device_kind_microwave_rx",
+      "value": "Microwave Receiver"
+    },
+    {
+      "name": "device_kind_microwave_tx",
+      "value": "Microwave Transmitter"
+    },
+    {
+      "name": "device_kind_fiber",
+      "value": "Fiber Device"
+    },
+    {
+      "name": "device_kind_unknown",
+      "value": "Unknown Device"
+    },
+    {
+      "name": "home_tip_permission_denied_search",
+      "value": "Insufficient permissions, unable to scan devices."
+    },
+    {
+      "name": "device_unknown_name",
+      "value": "Unknown Device"
+    },
+    {
+      "name": "home_search_tip_stopped",
+      "value": "Scanning stopped."
+    },
+    {
+      "name": "home_search_tip_connecting",
+      "value": "Connecting to device, please wait..."
+    },
+    {
+      "name": "home_connect_mode_ble",
+      "value": "Current connection mode: Bluetooth scan"
+    },
+    {
+      "name": "home_connect_mode_sta",
+      "value": "Current connection mode: STA mode"
+    },
+    {
+      "name": "home_connect_mode_tcp",
+      "value": "Current connection mode: TCP mode"
+    },
+    {
+      "name": "toast_copy_machine_code_success",
+      "value": "Machine code copied to clipboard."
+    },
+    {
+      "name": "toast_paste_read_failed",
+      "value": "Failed to read clipboard."
+    },
+    {
+      "name": "toast_paste_empty",
+      "value": "Clipboard is empty."
+    },
+    {
+      "name": "toast_paste_success",
+      "value": "Clipboard content pasted."
+    },
+    {
+      "name": "toast_paste_no_text",
+      "value": "No usable text in clipboard."
+    },
+    {
+      "name": "home_send_test_need_connect",
+      "value": "Please connect a device before sending test command."
+    },
+    {
+      "name": "home_send_test_sending",
+      "value": "Test command sent, waiting for waveform data..."
+    },
+    {
+      "name": "home_send_test_failed",
+      "value": "Failed to send test command, please check the connection."
+    },
+    {
+      "name": "home_detect_step1",
+      "value": "Detecting device type: Step 1 (Microwave receiver)..."
+    },
+    {
+      "name": "home_detect_step2",
+      "value": "Detecting device type: Step 2 (Fiber device)..."
+    },
+    {
+      "name": "home_detect_step3",
+      "value": "Detecting device type: Step 3 (Microwave transmitter)..."
+    },
+    {
+      "name": "home_search_tip_found_devices_fmt",
+      "value": "%d devices found."
+    },
+    {
+      "name": "device_status_connecting",
+      "value": "Connecting"
+    },
+    {
+      "name": "device_status_disconnecting",
+      "value": "Disconnecting"
+    },
+    {
+      "name": "home_lang_label",
+      "value": "Language"
+    },
+    {
+      "name": "home_lang_zh_cn",
+      "value": "Chinese"
+    },
+    {
+      "name": "home_lang_en_us",
+      "value": "English"
+    },
+    {
+      "name": "home_lang_ja_jp",
+      "value": "Japanese"
+    }
+
+
+
+  ]
+}

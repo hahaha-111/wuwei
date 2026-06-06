@@ -1,0 +1,342 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "module description"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "description"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "无畏"
+    },
+    {
+      "name": "BelManagement",
+      "value": "管理蓝牙需要权限"
+    },
+    {
+      "name": "UseBel",
+      "value": "使用蓝牙需要权限"
+    },
+    {
+      "name": "SearchBel",
+      "value": "搜索蓝牙需要权限"
+    },
+    {
+      "name": "UseLOCATION",
+      "value": "搜索设备需要定位权限"
+    },
+    {
+      "name": "SearchLOCATION",
+      "value": "搜索设备需要权限"
+    },
+
+
+    {
+      "name": "auth_dialog_title",
+      "value": "软件授权"
+    },
+    {
+      "name": "auth_machine_code_label",
+      "value": "机器码："
+    },
+    {
+      "name": "auth_copy",
+      "value": "复制"
+    },
+    {
+      "name": "auth_register_placeholder",
+      "value": "请输入注册码"
+    },
+
+
+    {
+      "name": "common_cancel",
+      "value": "取消"
+    },
+    {
+      "name": "common_confirm",
+      "value": "确定"
+    },
+    {
+      "name": "common_unknown",
+      "value": "未知"
+    },
+
+    {
+      "name": "home_version_text",
+      "value": "当前软件版本 %s"
+    },
+    {
+      "name": "home_title_main",
+      "value": "无畏周界报警服务软件"
+    },
+    {
+      "name": "home_title_sub",
+      "value": "Wu Wei Perimeter Alarm Service Software"
+    },
+
+
+
+    {
+      "name": "btn_serial_assistant",
+      "value": "串口测试助手"
+    },
+    {
+      "name": "btn_monitor_test",
+      "value": "测试跳转 Monitor"
+    },
+
+
+    {
+      "name": "btn_search_device",
+      "value": "搜索设备"
+    },
+    {
+      "name": "btn_stop_search",
+      "value": "停止搜索"
+    },
+    {
+      "name": "label_sta_mode",
+      "value": "STA 模式"
+    },
+    {
+      "name": "label_tcp_mode",
+      "value": "TCP 模式"
+    },
+    {
+      "name": "label_connect_state",
+      "value": "连接状态："
+    },
+    {
+      "name": "label_search_progress",
+      "value": "搜索进度"
+    },
+
+    {
+      "name": "table_header_name",
+      "value": "名称"
+    },
+    {
+      "name": "table_header_address",
+      "value": "地址/ID"
+    },
+    {
+      "name": "table_header_status",
+      "value": "状态"
+    },
+    {
+      "name": "table_header_signal",
+      "value": "信号"
+    },
+
+
+    {
+      "name": "list_empty_searching",
+      "value": "正在搜索附近设备..."
+    },
+    {
+      "name": "list_empty_no_device",
+      "value": "暂未发现设备，点击“搜索设备”开始"
+    },
+
+
+    {
+      "name": "home_intro_line",
+      "value": "周界防护 · 光纤栅栏 · 振动电缆 · 微波对射等"
+    },
+    {
+      "name": "home_company_address",
+      "value": "地址：北京市朝阳区建国路93号院 万达广场1号楼2305室"
+    },
+    {
+      "name": "home_company_phone",
+      "value": "电话：+86-10-85987525/6"
+    },
+    {
+      "name": "home_company_website",
+      "value": "www.rodashine.com.cn"
+    },
+    {
+      "name": "home_search_tip_idle",
+      "value": "点击“搜索设备”开始搜索"
+    },
+    {
+      "name": "connect_state_disconnected",
+      "value": "未连接"
+    },
+    {
+      "name": "home_search_tip_connect_success",
+      "value": "蓝牙设备连接成功，正在发现服务..."
+    },
+    {
+      "name": "home_search_tip_notify_failed",
+      "value": "蓝牙服务就绪，但通知通道开启失败，请重连设备"
+    },
+    {
+      "name": "home_search_tip_detecting_device",
+      "value": "蓝牙设备服务就绪，正在识别设备类型..."
+    },
+    {
+      "name": "home_search_tip_detect_success_fmt",
+      "value": "设备类型识别成功：%s"
+    },
+    {
+      "name": "home_search_tip_detect_unknown",
+      "value": "未能识别设备类型，按“未知设备”处理"
+    },
+    {
+      "name": "home_search_tip_discover_failed",
+      "value": "服务发现失败，请检查设备"
+    },
+    {
+      "name": "home_search_tip_disconnected",
+      "value": "设备已断开"
+    },
+    {
+      "name": "connect_state_connected_fmt",
+      "value": "已连接: %s"
+    },
+    {
+      "name": "connect_state_connecting_fmt",
+      "value": "正在连接: %s"
+    },
+    {
+      "name": "connect_state_disconnecting_fmt",
+      "value": "正在断开: %s"
+    },
+    {
+      "name": "home_error_context_not_ready",
+      "value": "内部错误：上下文未就绪"
+    },
+    {
+      "name": "license_warn_left_runs",
+      "value": "当前授权剩余次数约 %d 次，请及时续费。"
+    },
+    {
+      "name": "license_warn_left_days",
+      "value": "当前授权剩余有效期约 %d 天，请及时续费。"
+    },
+    {
+      "name": "device_kind_microwave_rx",
+      "value": "微波接收"
+    },
+    {
+      "name": "device_kind_microwave_tx",
+      "value": "微波发射"
+    },
+    {
+      "name": "device_kind_fiber",
+      "value": "光纤设备"
+    },
+    {
+      "name": "device_kind_unknown",
+      "value": "未知设备"
+    },
+    {
+      "name": "home_tip_permission_denied_search",
+      "value": "权限不足，无法搜索设备"
+    },
+    {
+      "name": "device_unknown_name",
+      "value": "未知设备"
+    },
+    {
+      "name": "home_search_tip_stopped",
+      "value": "搜索已停止"
+    },
+    {
+      "name": "home_search_tip_connecting",
+      "value": "正在连接设备，请稍候..."
+    },
+    {
+      "name": "home_connect_mode_ble",
+      "value": "当前连接方式：蓝牙搜索模式"
+    },
+    {
+      "name": "home_connect_mode_sta",
+      "value": "当前连接方式：STA 模式"
+    },
+    {
+      "name": "home_connect_mode_tcp",
+      "value": "当前连接方式：TCP 模式"
+    },
+    {
+      "name": "toast_copy_machine_code_success",
+      "value": "机器码已复制到剪贴板"
+    },
+    {
+      "name": "toast_paste_read_failed",
+      "value": "读取剪贴板失败"
+    },
+    {
+      "name": "toast_paste_empty",
+      "value": "剪贴板为空"
+    },
+    {
+      "name": "toast_paste_success",
+      "value": "已粘贴剪贴板内容"
+    },
+    {
+      "name": "toast_paste_no_text",
+      "value": "剪贴板中没有可用文本"
+    },
+    {
+      "name": "home_send_test_need_connect",
+      "value": "请先连接设备后再发送测试命令"
+    },
+    {
+      "name": "home_send_test_sending",
+      "value": "已发送测试命令，等待设备返回波形数据..."
+    },
+    {
+      "name": "home_send_test_failed",
+      "value": "发送测试命令失败，请检查连接"
+    },
+    {
+      "name": "home_detect_step1",
+      "value": "正在识别设备类型：步骤1（微波接收端检测）..."
+    },
+    {
+      "name": "home_detect_step2",
+      "value": "正在识别设备类型：步骤2（光纤设备检测）..."
+    },
+    {
+      "name": "home_detect_step3",
+      "value": "正在识别设备类型：步骤3（微波发射端检测）..."
+    },
+    {
+      "name": "home_search_tip_found_devices_fmt",
+      "value": "已发现 %d 个设备"
+    },
+    {
+      "name": "device_status_connecting",
+      "value": "正在连接"
+    },
+    {
+      "name": "device_status_disconnecting",
+      "value": "正在断开"
+    },
+    {
+      "name": "home_lang_label",
+      "value": "语言"
+    },
+    {
+      "name": "home_lang_zh_cn",
+      "value": "中文"
+    },
+    {
+      "name": "home_lang_en_us",
+      "value": "English"
+    },
+    {
+      "name": "home_lang_ja_jp",
+      "value": "日本語"
+    }
+
+
+
+  ]
+}

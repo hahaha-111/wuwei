@@ -1,0 +1,14 @@
+{
+  "src": [
+    "pages/Index",
+    "pages/HomePage",
+    "pages/MonitorPage",
+    "pages/CalibratePage",
+    "pages/AlarmRecordPage",
+    "pages/SettingPage",
+    "pages/LogPage",
+    "pages/RecordListPage",
+    "pages/AlarmAnalysisPage",
+    "pages/FilterSettingPage"
+  ]
+}

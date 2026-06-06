@@ -1,0 +1,334 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "モジュールの説明"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "説明"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "无畏"
+    },
+    {
+      "name": "BelManagement",
+      "value": "Bluetooth の管理には権限が必要です"
+    },
+    {
+      "name": "UseBel",
+      "value": "Bluetooth を使用するには権限が必要です"
+    },
+    {
+      "name": "SearchBel",
+      "value": "Bluetooth デバイスの検索には権限が必要です"
+    },
+    {
+      "name": "UseLOCATION",
+      "value": "デバイスを検索するには位置情報の権限が必要です"
+    },
+    {
+      "name": "SearchLOCATION",
+      "value": "デバイスを検索するには権限が必要です"
+    },
+
+    {
+      "name": "auth_dialog_title",
+      "value": "ソフトウェア認証"
+    },
+    {
+      "name": "auth_machine_code_label",
+      "value": "マシンコード："
+    },
+    {
+      "name": "auth_copy",
+      "value": "コピー"
+    },
+    {
+      "name": "auth_register_placeholder",
+      "value": "ライセンスキーを入力してください"
+    },
+
+    {
+      "name": "common_cancel",
+      "value": "キャンセル"
+    },
+    {
+      "name": "common_confirm",
+      "value": "OK"
+    },
+    {
+      "name": "common_unknown",
+      "value": "不明"
+    },
+
+    {
+      "name": "home_version_text",
+      "value": "現在のソフトウェアバージョン %s"
+    },
+    {
+      "name": "home_title_main",
+      "value": "无畏周界警報サービスソフトウェア"
+    },
+    {
+      "name": "home_title_sub",
+      "value": "Wu Wei Perimeter Alarm Service Software"
+    },
+
+    {
+      "name": "btn_serial_assistant",
+      "value": "シリアルポートテストツール"
+    },
+    {
+      "name": "btn_monitor_test",
+      "value": "Monitor 画面テスト遷移"
+    },
+
+    {
+      "name": "btn_search_device",
+      "value": "デバイスを検索"
+    },
+    {
+      "name": "btn_stop_search",
+      "value": "検索を停止"
+    },
+    {
+      "name": "label_sta_mode",
+      "value": "STA モード"
+    },
+    {
+      "name": "label_tcp_mode",
+      "value": "TCP モード"
+    },
+    {
+      "name": "label_connect_state",
+      "value": "接続状態："
+    },
+    {
+      "name": "label_search_progress",
+      "value": "検索進捗"
+    },
+
+    {
+      "name": "table_header_name",
+      "value": "名称"
+    },
+    {
+      "name": "table_header_address",
+      "value": "アドレス / ID"
+    },
+    {
+      "name": "table_header_status",
+      "value": "状態"
+    },
+    {
+      "name": "table_header_signal",
+      "value": "信号"
+    },
+
+    {
+      "name": "list_empty_searching",
+      "value": "周辺のデバイスを検索しています..."
+    },
+    {
+      "name": "list_empty_no_device",
+      "value": "デバイスが見つかりません。「デバイスを検索」をタップして開始してください"
+    },
+
+    {
+      "name": "home_intro_line",
+      "value": "周界防御・ファイバーセンサー・振動ケーブル・マイクロ波ビームなど"
+    },
+    {
+      "name": "home_company_address",
+      "value": "地址：北京市朝阳区建国路93号院 万达广场1号楼2305室"
+    },
+    {
+      "name": "home_company_phone",
+      "value": "電話：+86-10-85987525/6"
+    },
+    {
+      "name": "home_company_website",
+      "value": "www.rodashine.com.cn"
+    },
+    {
+      "name": "home_search_tip_idle",
+      "value": "「デバイスを検索」をタップして検索を開始します"
+    },
+    {
+      "name": "connect_state_disconnected",
+      "value": "未接続"
+    },
+    {
+      "name": "home_search_tip_connect_success",
+      "value": "Bluetooth デバイスに接続しました。サービスを検出しています..."
+    },
+    {
+      "name": "home_search_tip_notify_failed",
+      "value": "Bluetooth サービスは準備完了ですが、通知チャネルの有効化に失敗しました。デバイスを再接続してください。"
+    },
+    {
+      "name": "home_search_tip_detecting_device",
+      "value": "Bluetooth デバイスのサービスが準備完了。デバイス種別を認識しています..."
+    },
+    {
+      "name": "home_search_tip_detect_success_fmt",
+      "value": "デバイス種別を認識しました：%s"
+    },
+    {
+      "name": "home_search_tip_detect_unknown",
+      "value": "デバイス種別を認識できませんでした。「不明なデバイス」として扱います"
+    },
+    {
+      "name": "home_search_tip_discover_failed",
+      "value": "サービス検出に失敗しました。デバイスを確認してください"
+    },
+    {
+      "name": "home_search_tip_disconnected",
+      "value": "デバイスが切断されました"
+    },
+    {
+      "name": "connect_state_connected_fmt",
+      "value": "接続済み: %s"
+    },
+    {
+      "name": "connect_state_connecting_fmt",
+      "value": "接続中: %s"
+    },
+    {
+      "name": "connect_state_disconnecting_fmt",
+      "value": "切断中: %s"
+    },
+    {
+      "name": "home_error_context_not_ready",
+      "value": "内部エラー：コンテキストが準備できていません"
+    },
+    {
+      "name": "license_warn_left_runs",
+      "value": "現在のライセンスの残り回数は約 %d 回です。お早めに更新してください。"
+    },
+    {
+      "name": "license_warn_left_days",
+      "value": "現在のライセンスの有効期限は残り約 %d 日です。お早めに更新してください。"
+    },
+    {
+      "name": "device_kind_microwave_rx",
+      "value": "マイクロ波受信機"
+    },
+    {
+      "name": "device_kind_microwave_tx",
+      "value": "マイクロ波送信機"
+    },
+    {
+      "name": "device_kind_fiber",
+      "value": "ファイバーデバイス"
+    },
+    {
+      "name": "device_kind_unknown",
+      "value": "不明なデバイス"
+    },
+    {
+      "name": "home_tip_permission_denied_search",
+      "value": "権限が不足しているため、デバイスを検索できません"
+    },
+    {
+      "name": "device_unknown_name",
+      "value": "不明なデバイス"
+    },
+    {
+      "name": "home_search_tip_stopped",
+      "value": "検索を停止しました"
+    },
+    {
+      "name": "home_search_tip_connecting",
+      "value": "デバイスに接続しています。しばらくお待ちください..."
+    },
+    {
+      "name": "home_connect_mode_ble",
+      "value": "現在の接続方式：Bluetooth 検索モード"
+    },
+    {
+      "name": "home_connect_mode_sta",
+      "value": "現在の接続方式：STA モード"
+    },
+    {
+      "name": "home_connect_mode_tcp",
+      "value": "現在の接続方式：TCP モード"
+    },
+    {
+      "name": "toast_copy_machine_code_success",
+      "value": "マシンコードをクリップボードにコピーしました"
+    },
+    {
+      "name": "toast_paste_read_failed",
+      "value": "クリップボードの読み取りに失敗しました"
+    },
+    {
+      "name": "toast_paste_empty",
+      "value": "クリップボードが空です"
+    },
+    {
+      "name": "toast_paste_success",
+      "value": "クリップボードの内容を貼り付けました"
+    },
+    {
+      "name": "toast_paste_no_text",
+      "value": "クリップボードに有効なテキストがありません"
+    },
+    {
+      "name": "home_send_test_need_connect",
+      "value": "テストコマンドを送信する前に、デバイスに接続してください"
+    },
+    {
+      "name": "home_send_test_sending",
+      "value": "テストコマンドを送信しました。デバイスからの波形データを待っています..."
+    },
+    {
+      "name": "home_send_test_failed",
+      "value": "テストコマンドの送信に失敗しました。接続を確認してください"
+    },
+    {
+      "name": "home_detect_step1",
+      "value": "デバイス種別を識別中：ステップ1（マイクロ波受信機の検出）..."
+    },
+    {
+      "name": "home_detect_step2",
+      "value": "デバイス種別を識別中：ステップ2（ファイバーデバイスの検出）..."
+    },
+    {
+      "name": "home_detect_step3",
+      "value": "デバイス種別を識別中：ステップ3（マイクロ波送信機の検出）..."
+    },
+    {
+      "name": "home_search_tip_found_devices_fmt",
+      "value": "%d 個のデバイスを検出しました"
+    },
+    {
+      "name": "device_status_connecting",
+      "value": "接続中"
+    },
+    {
+      "name": "device_status_disconnecting",
+      "value": "切断中"
+    },
+
+    {
+      "name": "home_lang_label",
+      "value": "言語"
+    },
+    {
+      "name": "home_lang_zh_cn",
+      "value": "中国語"
+    },
+    {
+      "name": "home_lang_en_us",
+      "value": "英語"
+    },
+    {
+      "name": "home_lang_ja_jp",
+      "value": "日本語"
+    }
+
+  ]
+}
