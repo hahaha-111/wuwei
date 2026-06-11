@@ -32,8 +32,6 @@
       "name": "SearchLOCATION",
       "value": "搜索设备需要权限"
     },
-
-
     {
       "name": "auth_dialog_title",
       "value": "软件授权"
@@ -50,8 +48,6 @@
       "name": "auth_register_placeholder",
       "value": "请输入注册码"
     },
-
-
     {
       "name": "common_cancel",
       "value": "取消"
@@ -64,7 +60,6 @@
       "name": "common_unknown",
       "value": "未知"
     },
-
     {
       "name": "home_version_text",
       "value": "当前软件版本 %s"
@@ -77,9 +72,6 @@
       "name": "home_title_sub",
       "value": "Wu Wei Perimeter Alarm Service Software"
     },
-
-
-
     {
       "name": "btn_serial_assistant",
       "value": "串口测试助手"
@@ -88,8 +80,6 @@
       "name": "btn_monitor_test",
       "value": "测试跳转 Monitor"
     },
-
-
     {
       "name": "btn_search_device",
       "value": "搜索设备"
@@ -114,7 +104,6 @@
       "name": "label_search_progress",
       "value": "搜索进度"
     },
-
     {
       "name": "table_header_name",
       "value": "名称"
@@ -131,8 +120,6 @@
       "name": "table_header_signal",
       "value": "信号"
     },
-
-
     {
       "name": "list_empty_searching",
       "value": "正在搜索附近设备..."
@@ -141,8 +128,6 @@
       "name": "list_empty_no_device",
       "value": "暂未发现设备，点击“搜索设备”开始"
     },
-
-
     {
       "name": "home_intro_line",
       "value": "周界防护 · 光纤栅栏 · 振动电缆 · 微波对射等"
@@ -319,7 +304,6 @@
       "name": "device_status_disconnecting",
       "value": "正在断开"
     },
-
     {
       "name": "home_lang_label",
       "value": "语言"
@@ -335,9 +319,10 @@
     {
       "name": "home_lang_ja_jp",
       "value": "日本語"
+    },
+    {
+      "name": "ReadPasteboard",
+      "value": "用于读取剪贴板中的设备注册码进行授权验证"
     }
-
-
-
   ]
 }

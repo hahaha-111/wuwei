@@ -4,7 +4,6 @@
 import { ITransport, TransportState, TransportStateCallback, TransportDataCallback } from './ITransport';
 import gattClientManager from '../../bluetooth/GattClientManager';
 import { constant, ble } from '@kit.ConnectivityKit';
-import { BusinessError } from '@kit.BasicServicesKit';
 
 export class BleTransport implements ITransport {
   private static instance: BleTransport;

@@ -9,7 +9,7 @@ import { TcpTransport } from '../common/transport/TcpTransport';
 import { util } from '@kit.ArkTS';
 
 import pasteboard from '@ohos.pasteboard';
-import { promptAction } from '@kit.ArkUI';
+import { UIContext, router } from '@kit.ArkUI'; // ⭐ 修复：统一引入 UIContext 与 router，去除 promptAction
 import window from '@ohos.window';
 import dataPreferences from '@ohos.data.preferences';
 
@@ -20,7 +20,6 @@ import { PermissionUtil } from '../utils/PermissionUtil';
 import { BLE_PERMISSIONS } from '../utils/PermissionsConfig';
 
 import { LicenseManager, LicenseCheckResult } from '../common/LicenseManager';
-import router from '@ohos.router';
 
 import { detectScreenInfo, ScreenType as ScreenTypeFromHelper } from '../common/ScreenTypeHelper';
 import { DeviceType, ProtocolFrame, ProtocolParser } from '../common/ProtocolParser';
@@ -93,7 +92,8 @@ export class HomePageBleViewModel {
   showTcpDialog: boolean = false;
   tcpListConnected: boolean = false;
 
-  // ⭐ 新增：TCP接收数据缓冲和定时器
+  public uiContext: UIContext | null = null; 
+
   private receiveBuffer: string = '';
   private receiveTimer: number | undefined = undefined;
 
@@ -112,6 +112,18 @@ export class HomePageBleViewModel {
   private readonly LISTENER_KEY = 'HomePageVM';
 
   private localParser: ProtocolParser = new ProtocolParser();
+
+  // ⭐ 修复编译报错：直接传递强类型字面量给 showToast，去除 .catch() 以符合返回 void 的签名
+  private showToastMsg(msg: string, duration?: number): void {
+    if (this.uiContext) {
+      try {
+        this.uiContext.getPromptAction().showToast({
+          message: msg,
+          duration: duration
+        });
+      } catch (e) {}
+    }
+  }
 
   private getString(res: Resource, fallback?: string): string {
     if (!this.context) return fallback ?? '';
@@ -149,7 +161,7 @@ export class HomePageBleViewModel {
       if (currentAppLang === langCode) return;
       i18n.System.setAppPreferredLanguage(langCode);
       this.refreshLocalizedText();
-      try { promptAction.showToast({ message: 'Language switching...' }); } catch(e) {}
+      this.showToastMsg('Language switching...'); 
     } catch (error) {
       console.error('Change language failed: ' + error);
     }
@@ -232,12 +244,12 @@ export class HomePageBleViewModel {
     if (!res.ok) {
       this.showAuthDialog = true;
       if (res.msg) {
-        try { promptAction.showToast({ message: res.msg, duration: 3000 }); } catch(e) {}
+        this.showToastMsg(res.msg, 3000); 
       }
       return false;
     }
     if (consume && res.isNearExpiry && res.expiryMsg) {
-      try { promptAction.showToast({ message: res.expiryMsg, duration: 3500 }); } catch(e) {}
+      this.showToastMsg(res.expiryMsg, 3500); 
     }
     return true;
   }
@@ -434,8 +446,9 @@ export class HomePageBleViewModel {
     if (kind === 'MICROWAVE_TX') { deviceType = DeviceType.Microwave; deviceKind = 'TX'; }
     else if (kind === 'MICROWAVE_RX') { deviceType = DeviceType.Microwave; deviceKind = 'RX'; }
     else if (kind === 'FIBER') { deviceType = DeviceType.Fiber; deviceKind = 'FIBER'; }
-    try {
-      router.pushUrl({
+    
+    if (this.uiContext) {
+      this.uiContext.getRouter().pushUrl({
         url: 'pages/MonitorPage',
         params: {
           screenType: this.screenType,
@@ -443,8 +456,8 @@ export class HomePageBleViewModel {
           deviceKind: deviceKind,
           connectionMode: (this.staMode || this.tcpMode) ? 'TCP' : 'BLE'
         }
-      }).catch(() => {});
-    } catch (err) {}
+      }, router.RouterMode.Standard).catch(() => {});
+    }
   }
 
   private delay(ms: number): Promise<void> {
@@ -506,7 +519,6 @@ export class HomePageBleViewModel {
     }
   }
 
-  // ⭐ UI中搜索按钮触发的方法
   onSearchButtonClick() {
     if (this.staMode) {
       this.autoFetchTcpList();
@@ -515,7 +527,6 @@ export class HomePageBleViewModel {
     }
   }
 
-  // ⭐ 点击报警分析触发的 TCP 请求
   async onAlarmAnalysisClick() {
     if (!await this.ensureAuthorized(false)) return;
 
@@ -567,8 +578,9 @@ export class HomePageBleViewModel {
     this.tcpListClient.setOnMessage((event: TcpMessageEvent) => {
       const data = new Uint8Array(event.message);
       try {
-        const decoder = new util.TextDecoder('gbk', { ignoreBOM: true });
-        this.receiveBuffer += decoder.decodeWithStream(data);
+        // ⭐ 修复：统一替换遗留的过时 API 为官方强力推介的静态工厂方法
+        const decoder = util.TextDecoder.create('gbk', { ignoreBOM: true });
+        this.receiveBuffer += decoder.decodeToString(data);
       } catch (e) {}
 
       if (this.receiveTimer !== undefined) {
@@ -585,14 +597,14 @@ export class HomePageBleViewModel {
             this.searchTip = '';
           }, 500);
 
-          try {
-            router.pushUrl({
+          if (this.uiContext) {
+            this.uiContext.getRouter().pushUrl({
               url: 'pages/AlarmAnalysisPage', 
               params: { alarmData: this.receiveBuffer }
-            }).catch((err: BusinessError) => { 
+            }, router.RouterMode.Standard).catch((err: Error) => { 
                console.error('跳转报警页面失败', err.message);
             });
-          } catch(e) {}
+          }
         } else {
           this.searchTip = '未获取到有效的报警统计数据格式';
           this.isSearching = false;
@@ -604,7 +616,7 @@ export class HomePageBleViewModel {
       this.searchTip = `连接失败: ${err.message}`;
       this.isSearching = false;
       this.tcpListConnected = false;
-      try { promptAction.showToast({ message: '连接服务器失败，请检查网络' }); } catch(e){}
+      this.showToastMsg('连接服务器失败，请检查网络');
     });
 
     this.tcpListClient.setOnClose(() => {
@@ -620,7 +632,6 @@ export class HomePageBleViewModel {
     }
   }
 
-  // ⭐ 用于获取服务器设备列表的独立方法
   private async autoFetchTcpList() {
     const ip = '43.138.24.214';
     const port = 10000;
@@ -651,8 +662,9 @@ export class HomePageBleViewModel {
       const data = new Uint8Array(event.message);
       let text = '';
       try {
-        const decoder = new util.TextDecoder('gbk', { ignoreBOM: true });
-        text = decoder.decodeWithStream(data);
+        // ⭐ 修复：统一替换遗留的过时 api 调用
+        const decoder = util.TextDecoder.create('gbk', { ignoreBOM: true });
+        text = decoder.decodeToString(data);
       } catch (e) {}
       
       this.parseAndAddTcpDevices(text, ip);
@@ -861,23 +873,30 @@ export class HomePageBleViewModel {
     } catch (e) {}
   }
 
-  copyMachineCode() {
+  async copyMachineCode(): Promise<void> {
     if (!this.machineCode) return;
-    const data = pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, this.machineCode);
-    pasteboard.getSystemPasteboard().setData(data);
-    try { promptAction.showToast({ message: this.getString($r('app.string.toast_copy_machine_code_success'), '已复制') }); } catch(e){}
+    try {
+      const data = pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, this.machineCode);
+      await pasteboard.getSystemPasteboard().setData(data);
+      this.showToastMsg(this.getString($r('app.string.toast_copy_machine_code_success'), '已复制')); 
+    } catch (e) {
+      console.error('Copy machine code failed', e);
+    }
   }
 
-  pasteRegisterCode() {
-    pasteboard.getSystemPasteboard().getData((err, data) => {
-      if (!err && data) {
+  async pasteRegisterCode(): Promise<void> {
+    try {
+      const data = await pasteboard.getSystemPasteboard().getData();
+      if (data) {
         const text = data.getPrimaryText();
         if (text) {
           this.registerCode = text;
-          try { promptAction.showToast({ message: this.getString($r('app.string.toast_paste_success'), '已粘贴') }); } catch(e){}
+          this.showToastMsg(this.getString($r('app.string.toast_paste_success'), '已粘贴')); 
         }
       }
-    });
+    } catch (e) {
+      console.error('Paste register code failed', e);
+    }
   }
 
   cancelLicenseDialog() { this.showAuthDialog = false; }

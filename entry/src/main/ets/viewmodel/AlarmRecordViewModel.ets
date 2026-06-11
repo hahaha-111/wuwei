@@ -1,6 +1,4 @@
 import { common } from '@kit.AbilityKit';
-import { fileIo as fs } from '@kit.CoreFileKit';
-import { constant } from '@kit.ConnectivityKit';
 import { ProtocolFrame, DeviceType, ProtocolParser } from '../common/ProtocolParser';
 import { UIContext, router } from '@kit.ArkUI'; 
 import { MonitorPageParams } from '../viewmodel/MonitorViewModel';
@@ -72,9 +70,8 @@ public connectionMode: 'BLE' | 'TCP' = 'BLE';
 public deviceType: DeviceType = DeviceType.Microwave;
 public currentDeviceAddress: number = 0x01;
 
-private protocolVersion: ProtocolVersion = ProtocolVersion.UNKNOWN;
-private queryToggle: boolean = false;
-private queryTimer: number = 0;
+  private protocolVersion: ProtocolVersion = ProtocolVersion.UNKNOWN;
+  private queryTimer: number = 0;
 private waveQueryTimer: number = 0;
 private sysTimeTimer: number = 0;
 
@@ -108,11 +105,8 @@ this.uiContext.getPromptAction().showToast({ message: msg });
 
 setOnWaveChange(cb: () => void): void {
 this.waveChangeCallback = cb;
-}
+  }
 
-private bytesToHex(data: Uint8Array): string {
-return Array.from(data).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
-}
 
 private getLogState(): AlarmLogState {
 const id = this.transport.getId() || 'temp_session';
@@ -595,8 +589,7 @@ const hour = raw[9].toString().padStart(2, '0');
 const minute = raw[10].toString().padStart(2, '0');
 const second = raw[11].toString().padStart(2, '0');
 const adc_in = raw[13];
-const adc_vcc = raw[14];
-const adc_pw = raw[15];
+  const adc_vcc = raw[14];
 
 const timeStr = `20${year}/${month}/${day} ${hour}:${minute}:${second}`;
 

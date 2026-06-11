@@ -1,4 +1,3 @@
-import { util } from '@kit.ArkTS';
 import {
   DecodedCommand,
   CommandPayload,

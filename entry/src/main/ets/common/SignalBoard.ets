@@ -209,7 +209,7 @@ export struct SignalBoard {
         .layoutWeight(1)
         .backgroundColor('#FFFFFF')
         // ⭐ 修复核心：移除明确的 LengthAreaInfo 强类型声明，依靠 ArkUI 基础组件回调自动推断类型
-        .onAreaChange((oldValue: Area, newValue: Area) => {
+        .onAreaChange((_oldValue: Area, newValue: Area) => {
           this.canvasWidth = newValue.width as number;
           this.canvasHeight = newValue.height as number;
           this.isGridCached = false;

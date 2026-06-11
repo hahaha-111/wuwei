@@ -16,16 +16,10 @@ export class GattClientManager {
   private notifyCharUuid: string = '0000FFF1-0000-1000-8000-00805F9B34FB';
   private readonly cccUuid: string = '00002902-0000-1000-8000-00805F9B34FB';
 
-  private service?: ble.GattService;
   private writeChar?: ble.BLECharacteristic;
   private notifyChar?: ble.BLECharacteristic;
-  private notifyCccDesc?: ble.BLEDescriptor;
   private writeType: ble.GattWriteType = ble.GattWriteType.WRITE;
 
-  private foundService: boolean = false;
-  private foundWriteChar: boolean = false;
-  private foundNotifyChar: boolean = false;
-  private foundNotifyCcc: boolean = false;
 
   private protocolParser: ProtocolParser = new ProtocolParser();
   private connStateCallback?: (state: ble.ProfileConnectionState, deviceId: string) => void;
@@ -33,10 +27,8 @@ export class GattClientManager {
   private frameCallback?: (frame: ProtocolFrame) => void;
 
   private writeBusy: boolean = false;
-  private debugLog: boolean = false;
 
-  public setDebugLog(enabled: boolean): void {
-    this.debugLog = enabled;
+  public setDebugLog(): void {
   }
 
   public updateTargetService(serviceUuid: string, writeUuid: string, notifyUuid: string) {
@@ -54,14 +46,8 @@ export class GattClientManager {
   }
 
   private resetCache() {
-    this.service = undefined;
     this.writeChar = undefined;
     this.notifyChar = undefined;
-    this.notifyCccDesc = undefined;
-    this.foundService = false;
-    this.foundWriteChar = false;
-    this.foundNotifyChar = false;
-    this.foundNotifyCcc = false;
     this.writeBusy = false;
     this.writeType = ble.GattWriteType.WRITE;
     this.protocolParser = new ProtocolParser();
@@ -70,13 +56,10 @@ export class GattClientManager {
   private checkService(services: Array<ble.GattService>) {
     for (const svc of services) {
       if (svc.serviceUuid !== this.serviceUuid) continue;
-      this.service = svc;
-      this.foundService = true;
 
       for (const ch of svc.characteristics) {
         if (ch.characteristicUuid === this.writeCharUuid) {
           this.writeChar = ch;
-          this.foundWriteChar = true;
           if (ch.properties.writeNoResponse) {
             this.writeType = ble.GattWriteType.WRITE_NO_RESPONSE;
           } else if (ch.properties.write) {
@@ -87,11 +70,8 @@ export class GattClientManager {
         }
         if (ch.characteristicUuid === this.notifyCharUuid) {
           this.notifyChar = ch;
-          this.foundNotifyChar = true;
           for (const des of ch.descriptors) {
             if (des.descriptorUuid === this.cccUuid) {
-              this.notifyCccDesc = des;
-              this.foundNotifyCcc = true;
             }
           }
         }

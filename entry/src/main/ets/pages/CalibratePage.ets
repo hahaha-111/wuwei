@@ -1,5 +1,5 @@
 import { common } from '@kit.AbilityKit';
-import router from '@ohos.router';
+import { router } from '@kit.ArkUI'; // ⭐ 修改：统一使用 ArkUI 下的现代 router API
 import { SignalCalibrateViewModel } from '../viewmodel/SignalCalibrateViewModel';
 import { MonitorPageParams } from '../viewmodel/MonitorViewModel';
 
@@ -34,14 +34,16 @@ struct CalibratePage {
   private peakH: number = 0;
 
   private currentTab: string = 'calibrate';
-  private contextAbility: common.UIAbilityContext | null = null;
+  
+  // ⭐ 修复：删除了未被使用的 contextAbility 变量，消除 'never read' 警告
 
   aboutToAppear() {
-    const ctx = getContext(this) as common.UIAbilityContext;
-    this.contextAbility = ctx;
+    // ⭐ 修复：使用 API 13 专用的 getHostContext 代替已过时的全局 getContext(this)
+    const ctx = this.getUIContext().getHostContext() as common.UIAbilityContext;
 
     try {
-      const params = router.getParams() as MonitorPageParams;
+      // ⭐ 修复：使用 UIContext 下的安全路由获取参数
+      const params = this.getUIContext().getRouter().getParams() as MonitorPageParams;
       this.vm.init(params, ctx);
     } catch (e) {
       this.vm.onAppear(ctx);
@@ -238,11 +240,22 @@ struct CalibratePage {
     this.vm.stopCalibration(); // 切换前发送退出指令
 
     const params = this.vm.getNavParams();
+    const routerInstance = this.getUIContext().getRouter();
+    
+    // ⭐ 修复：直接挂载 .catch()，接管 Promise 的异常抛出，同时满足 Standard 路由模式和严格语法
     switch (tab) {
-      case 'home': router.replaceUrl({ url: 'pages/MonitorPage', params: params }).catch(() => {}); break;
-      case 'alarm': router.replaceUrl({ url: 'pages/AlarmRecordPage', params: params }).catch(() => {}); break;
-      case 'setting': router.replaceUrl({ url: 'pages/SettingPage', params: params }).catch(() => {}); break;
-      case 'log': router.replaceUrl({ url: 'pages/LogPage', params: params }).catch(() => {}); break;
+      case 'home':
+        routerInstance.replaceUrl({ url: 'pages/MonitorPage', params: params }, router.RouterMode.Standard).catch(() => {});
+        break;
+      case 'alarm':
+        routerInstance.replaceUrl({ url: 'pages/AlarmRecordPage', params: params }, router.RouterMode.Standard).catch(() => {});
+        break;
+      case 'setting':
+        routerInstance.replaceUrl({ url: 'pages/SettingPage', params: params }, router.RouterMode.Standard).catch(() => {});
+        break;
+      case 'log':
+        routerInstance.replaceUrl({ url: 'pages/LogPage', params: params }, router.RouterMode.Standard).catch(() => {});
+        break;
     }
   }
 

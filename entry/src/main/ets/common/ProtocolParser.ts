@@ -1,4 +1,3 @@
-import { util } from '@kit.ArkTS';
 
 export enum DeviceType {
   Microwave = 0xC9,

@@ -1,6 +1,5 @@
-import router from '@ohos.router';
+import { router } from '@kit.ArkUI'; // ⭐ 修改：统一使用 ArkUI 路由
 import { common } from '@kit.AbilityKit';
-import { promptAction } from '@kit.ArkUI';
 import { LogViewModel, LogGroup } from '../viewmodel/LogViewModel';
 import { LogEntity, LogCategory } from '../common/database/LogEntity';
 import { MonitorPageParams } from '../viewmodel/MonitorViewModel';
@@ -24,8 +23,10 @@ struct LogPage {
   @State pickedDate: Date = new Date();
 
   aboutToAppear() {
-    const ctx = getContext(this) as common.UIAbilityContext;
-    const params = router.getParams() as MonitorPageParams;
+    // ⭐ 修复：全面注入 UIContext，并替换废弃获取参数的方式
+    this.vm.uiContext = this.getUIContext();
+    const ctx = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    const params = this.getUIContext().getRouter().getParams() as MonitorPageParams;
     this.vm.init(ctx, params);
   }
 
@@ -35,7 +36,7 @@ struct LogPage {
     }
 
     if (tab === 'calibrate' && this.vm.deviceType !== DeviceType.Microwave) {
-      try { promptAction.showToast({ message: '当前设备不支持校准功能' }); } catch (err) {}
+      try { this.getUIContext().getPromptAction().showToast({ message: '当前设备不支持校准功能' }); } catch (e) {}
       return;
     }
 
@@ -46,48 +47,59 @@ struct LogPage {
       deviceAddress: this.vm.currentDeviceAddress
     };
 
-    if (tab === 'home') {
-      router.replaceUrl({ url: 'pages/MonitorPage', params: navParams }).catch(() => {});
-    }
-    if (tab === 'calibrate') {
-      router.replaceUrl({ url: 'pages/CalibratePage', params: navParams }).catch(() => {});
-    }
-    if (tab === 'alarm') {
-      router.replaceUrl({ url: 'pages/AlarmRecordPage', params: navParams }).catch(() => {});
-    }
-    if (tab === 'setting') {
-      router.replaceUrl({ url: 'pages/SettingPage', params: navParams }).catch(() => {});
+    const uiRouter = this.getUIContext().getRouter();
+    
+    // ⭐ 修复：统一使用安全抛出包裹的路由
+    try {
+      if (tab === 'home') {
+        uiRouter.replaceUrl({ url: 'pages/MonitorPage', params: navParams }, router.RouterMode.Standard).catch(() => {});
+      }
+      if (tab === 'calibrate') {
+        uiRouter.replaceUrl({ url: 'pages/CalibratePage', params: navParams }, router.RouterMode.Standard).catch(() => {});
+      }
+      if (tab === 'alarm') {
+        uiRouter.replaceUrl({ url: 'pages/AlarmRecordPage', params: navParams }, router.RouterMode.Standard).catch(() => {});
+      }
+      if (tab === 'setting') {
+        uiRouter.replaceUrl({ url: 'pages/SettingPage', params: navParams }, router.RouterMode.Standard).catch(() => {});
+      }
+    } catch (e) {
+      console.error('Route failed', e);
     }
   }
 
   private showDatePickerDialog() {
-    DatePickerDialog.show({
-      start: new Date('2020-01-01'),
-      end: new Date('2030-12-31'),
-      selected: this.pickedDate,
-      onAccept: (value: DatePickerResult) => {
-        if (value.year !== undefined && value.month !== undefined && value.day !== undefined) {
-          this.pickedDate.setFullYear(value.year, value.month, value.day);
+    try {
+      // ⭐ 修复警告：弃用全局 DatePickerDialog，改用绑定的上下文调用
+      this.getUIContext().showDatePickerDialog({
+        start: new Date('2020-01-01'),
+        end: new Date('2030-12-31'),
+        selected: this.pickedDate,
+        onAccept: (value: DatePickerResult) => {
+          if (value.year !== undefined && value.month !== undefined && value.day !== undefined) {
+            this.pickedDate.setFullYear(value.year, value.month, value.day);
 
-          const monthStr = (value.month + 1).toString().padStart(2, '0');
-          const dayStr = value.day.toString().padStart(2, '0');
-          const targetDateStr = `${value.year}-${monthStr}-${dayStr}`;
+            const monthStr = (value.month + 1).toString().padStart(2, '0');
+            const dayStr = value.day.toString().padStart(2, '0');
+            const targetDateStr = `${value.year}-${monthStr}-${dayStr}`;
 
-          const flatIndex = this.vm.getFlattenedIndex(targetDateStr);
+            const flatIndex = this.vm.getFlattenedIndex(targetDateStr);
 
-          if (flatIndex >= 0) {
-            this.vm.expandGroup(targetDateStr);
-            // 稍作延迟确保折叠动画/UI更新完毕后再滚动
-            setTimeout(() => {
-              this.listScroller.scrollToIndex(flatIndex, true, ScrollAlign.START);
-            }, 100);
-            promptAction.showToast({ message: `已跳转至 ${targetDateStr}` });
-          } else {
-            promptAction.showToast({ message: `日期 ${targetDateStr} 无记录` });
+            if (flatIndex >= 0) {
+              this.vm.expandGroup(targetDateStr);
+              setTimeout(() => {
+                this.listScroller.scrollToIndex(flatIndex, true, ScrollAlign.START);
+              }, 100);
+              try { this.getUIContext().getPromptAction().showToast({ message: `已跳转至 ${targetDateStr}` }); } catch (e) {}
+            } else {
+              try { this.getUIContext().getPromptAction().showToast({ message: `日期 ${targetDateStr} 无记录` }); } catch (e) {}
+            }
           }
         }
-      }
-    })
+      });
+    } catch (e) {
+      console.error('Show DatePicker error', e);
+    }
   }
 
   @Builder topNavBar() {
@@ -121,7 +133,6 @@ struct LogPage {
     }
   }
 
-  // ⭐ 新增：根据设备名称自动生成不同的标签背景色，以区分不同设备
   private getDeviceTagColor(deviceName: string): string {
     const colors = ['#007DFF', '#E84026', '#00BFA5', '#FF9900', '#8E24AA', '#D81B60', '#00897B', '#3949AB'];
     if (!deviceName) return '#9E9E9E';
@@ -152,7 +163,6 @@ struct LogPage {
 
       Column() {
         Row() {
-          // ⭐ 修改：将原来的普通文本替换为带有背景色的专属设备标签
           Text(item.deviceName || '未知设备')
             .fontSize(10)
             .fontColor(Color.White)
@@ -209,9 +219,14 @@ struct LogPage {
     .backgroundColor('#F5F5F5')
     .border({ width: { bottom: 1 }, color: '#E0E0E0' })
     .onClick(() => {
-      animateTo({ duration: 250, curve: Curve.FastOutSlowIn }, () => {
-        this.vm.toggleGroup(date);
-      });
+      try {
+        // ⭐ 修复警告：改用 UIContext 的内置动画执行方法
+        this.getUIContext().animateTo({ duration: 250, curve: Curve.FastOutSlowIn }, () => {
+          this.vm.toggleGroup(date);
+        });
+      } catch (e) {
+        this.vm.toggleGroup(date); // Fallback
+      }
     })
   }
 
@@ -253,21 +268,26 @@ struct LogPage {
             .fontSize(12)
             .backgroundColor('#E53935')
             .onClick(() => {
-              AlertDialog.show({
-                title: '清空日志',
-                message: '确定要清空所有操作日志吗？此操作不可恢复。',
-                primaryButton: {
-                  value: '取消',
-                  action: () => {}
-                },
-                secondaryButton: {
-                  value: '清空',
-                  fontColor: '#D32F2F',
-                  action: () => {
-                    this.vm.clearLogs()
+              try {
+                // ⭐ 修复警告：替换废弃的全局弹窗调用
+                this.getUIContext().showAlertDialog({
+                  title: '清空日志',
+                  message: '确定要清空所有操作日志吗？此操作不可恢复。',
+                  primaryButton: {
+                    value: '取消',
+                    action: () => {}
+                  },
+                  secondaryButton: {
+                    value: '清空',
+                    fontColor: '#D32F2F',
+                    action: () => {
+                      this.vm.clearLogs()
+                    }
                   }
-                }
-              })
+                });
+              } catch (e) {
+                console.error('Alert dialog failed', e);
+              }
             })
         }
         .width('100%')
@@ -352,13 +372,14 @@ struct LogPage {
                 )
               }
             },
-            // 使用 group.date 作为外层唯一键
-            (group: LogGroup) => group.date
+            // ⭐ 核心修复：将 expanded 状态拼接进 Key 中，强制 ArkUI 在折叠/展开时重新绘制当前日期的数据块
+            (group: LogGroup) => group.date + '_' + group.expanded
           )
         }
       }
-      .layoutWeight(1)
       .width('100%')
+      .height('100%') // ⭐ 修复警告：补全了 List 缺失的明确高度声明属性
+      .layoutWeight(1)
       .backgroundColor(Color.White)
     }
     .width('100%')

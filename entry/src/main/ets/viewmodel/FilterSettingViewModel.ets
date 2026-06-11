@@ -1,5 +1,5 @@
-import { common } from '@kit.AbilityKit';
-import { promptAction } from '@kit.ArkUI';
+// ⭐ 修复警告：移除未使用的 common，替换过时的 promptAction 为 UIContext
+import { UIContext } from '@kit.ArkUI';
 
 import { TransportManager } from '../common/transport/TransportManager';
 import { ITransport } from '../common/transport/ITransport';
@@ -28,6 +28,9 @@ export class FilterSettingViewModel {
 
   public deviceType: DeviceType = DeviceType.Microwave;
   public currentAddress: number = 0x01;
+  
+  // ⭐ 新增：添加 UIContext 引用以支持安全弹窗
+  public uiContext: UIContext | null = null; 
 
   private transport: ITransport;
   private protocolParser: ProtocolParser = new ProtocolParser();
@@ -41,6 +44,15 @@ export class FilterSettingViewModel {
 
   constructor() {
     this.transport = TransportManager.getInstance().getTransport();
+  }
+
+  // ⭐ 核心修复：封装安全的 UIContext 弹窗，根除所有弃用和异常警告
+  private showToastMsg(msg: string): void {
+    if (this.uiContext) {
+      try {
+        this.uiContext.getPromptAction().showToast({ message: msg });
+      } catch (e) {}
+    }
   }
 
   init(params?: FilterSettingPageParams): void {
@@ -58,7 +70,7 @@ export class FilterSettingViewModel {
 
     // 开启 1 秒轮询，实时读取滤波状态 (0x92)
     this.pollTimer = setInterval((): void => {
-      // ⭐ 优化：如果在高级读取或设置中，暂停状态轮询以防指令交叉干扰
+      // 如果在高级读取或设置中，暂停状态轮询以防指令交叉干扰
       if (!this.pendingCommand && !this.isReading) {
         this.sendFrame(0x92);
       }
@@ -74,12 +86,7 @@ export class FilterSettingViewModel {
   }
 
   /**
-   * ⭐ 核心优化：带有重试和超时判断的高级查询器
-   * @param cmdToSend 要发送的命令
-   * @param expectedResp 期望回复的命令
-   * @param data 附带的数据
-   * @param timeout 单次超时时间 (毫秒)
-   * @param retries 失败后的重试次数
+   * 带有重试和超时判断的高级查询器
    */
   private async queryCommand(cmdToSend: number, expectedResp: number, data: number[] = [], timeout: number = 600, retries: number = 2): Promise<number[] | null> {
     for (let i = 0; i <= retries; i++) {
@@ -117,7 +124,7 @@ export class FilterSettingViewModel {
     this.isReading = true;
     
     try {
-      promptAction.showToast({ message: '正在读取滤波参数...' });
+      this.showToastMsg('正在读取滤波参数...');
 
       // 1. 读开关 0x8C
       let r = await this.queryCommand(0x8C, 0x8C);
@@ -135,9 +142,9 @@ export class FilterSettingViewModel {
       r = await this.queryCommand(0x93, 0x93);
       if (!r) throw new Error('读取预警时长超时，请重试');
 
-      promptAction.showToast({ message: '读取参数完毕!' });
+      this.showToastMsg('读取参数完毕!');
     } catch (e) {
-      promptAction.showToast({ message: (e as Error).message });
+      this.showToastMsg((e as Error).message);
     } finally {
       this.isReading = false;
     }
@@ -151,7 +158,6 @@ export class FilterSettingViewModel {
     if (cmd === 0x8C) {
       this.filterSwitch = payload[0] === 1;
     } else if (cmd === 0x8E) {
-      // ⭐ 修复时间进制问题：设备底层已完成 BCD 处理，直接利用 16进制字符串 还原展示
       this.startHour = payload[0].toString(16).padStart(2, '0');
       this.startMinute = payload[1].toString(16).padStart(2, '0');
     } else if (cmd === 0x90) {
@@ -165,7 +171,7 @@ export class FilterSettingViewModel {
       this.warnDuration = payload[0].toString(10);
     }
 
-    // ⭐ 解除高级查询器的锁定
+    // 解除高级查询器的锁定
     if (this.pendingCommand === cmd && this.commandResolve) {
       this.commandResolve(payload);
       this.commandResolve = null;
@@ -177,29 +183,28 @@ export class FilterSettingViewModel {
     this.filterSwitch = val;
     const r = await this.queryCommand(0x8D, 0x8D, [val ? 1 : 0]);
     if (r) {
-      promptAction.showToast({ message: val ? '设置滤波启用参数成功!' : '设置滤波关闭参数成功!' });
+      this.showToastMsg(val ? '设置滤波启用参数成功!' : '设置滤波关闭参数成功!');
       this.sendSaveCommand();
     } else {
-      promptAction.showToast({ message: '设置滤波开关失败，未收到响应' });
+      this.showToastMsg('设置滤波开关失败，未收到响应');
     }
   }
 
   async setStartTime(): Promise<void> {
-    // ⭐ 修复：直接作为 10进制数 发送，底层单片机会自己计算转化
     let h = parseInt(this.startHour, 10);
     let m = parseInt(this.startMinute, 10);
     
     if (isNaN(h) || h < 0 || h > 23 || isNaN(m) || m < 0 || m > 59) {
-      promptAction.showToast({ message: '输入范围不合法!' });
+      this.showToastMsg('输入范围不合法!');
       return;
     }
     
     const r = await this.queryCommand(0x8F, 0x8F, [h, m]);
     if (r) {
-      promptAction.showToast({ message: '设置滤波开始时间成功!' });
+      this.showToastMsg('设置滤波开始时间成功!');
       this.sendSaveCommand();
     } else {
-      promptAction.showToast({ message: '设置滤波开始时间失败' });
+      this.showToastMsg('设置滤波开始时间失败');
     }
   }
 
@@ -208,32 +213,32 @@ export class FilterSettingViewModel {
     let m = parseInt(this.endMinute, 10);
     
     if (isNaN(h) || h < 0 || h > 23 || isNaN(m) || m < 0 || m > 59) {
-      promptAction.showToast({ message: '输入范围不合法!' });
+      this.showToastMsg('输入范围不合法!');
       return;
     }
     
     const r = await this.queryCommand(0x91, 0x91, [h, m]);
     if (r) {
-      promptAction.showToast({ message: '设置滤波结束时间成功!' });
+      this.showToastMsg('设置滤波结束时间成功!');
       this.sendSaveCommand();
     } else {
-      promptAction.showToast({ message: '设置滤波结束时间失败' });
+      this.showToastMsg('设置滤波结束时间失败');
     }
   }
 
   async setWarnDuration(): Promise<void> {
     let d = parseInt(this.warnDuration, 10);
     if (isNaN(d) || d < 0 || d > 255) {
-      promptAction.showToast({ message: '输入范围不合法!' });
+      this.showToastMsg('输入范围不合法!');
       return;
     }
     
     const r = await this.queryCommand(0x94, 0x94, [d]);
     if (r) {
-      promptAction.showToast({ message: '设置预警时长成功!' });
+      this.showToastMsg('设置预警时长成功!');
       this.sendSaveCommand();
     } else {
-      promptAction.showToast({ message: '设置预警时长失败' });
+      this.showToastMsg('设置预警时长失败');
     }
   }
 

@@ -35,7 +35,8 @@ struct Index {
   @State vm: DebugViewModel = new DebugViewModel();
 
   aboutToAppear() {
-    const ctx = getContext(this) as common.UIAbilityContext;
+    // ⭐ 修复警告：使用 API 13 专用的 getHostContext
+    const ctx = this.getUIContext().getHostContext() as common.UIAbilityContext;
     this.vm.initBleCallbacks();
     this.vm.initWithContext(ctx); // 加载多字符串配置
   }
@@ -87,10 +88,11 @@ struct Index {
         Row() {
           Button(this.vm.scanning ? '停止扫描' : '扫描设备')
             .fontSize(FONT_SIZE_NORMAL)
-            .backgroundColor(this.vm.scanning ? COLOR_DANGER : COLOR_PRIMARY) // ⭐ 优化：扫描中变色
+            .backgroundColor(this.vm.scanning ? COLOR_DANGER : COLOR_PRIMARY) 
             .fontColor(Color.White)
             .onClick(async () => {
-              const ctx = getContext(this) as common.UIAbilityContext;
+              // ⭐ 修复警告：使用 API 13 专用的 getHostContext
+              const ctx = this.getUIContext().getHostContext() as common.UIAbilityContext;
               if (this.vm.scanning) {
                 this.vm.stopBleScan();
               } else {
@@ -167,12 +169,11 @@ struct Index {
     .margin({ bottom: 8 })
   }
 
-  /* ========== BLE 设备列表 (⭐ 已美化，不影响其他部分) ========== */
+  /* ========== BLE 设备列表 ========== */
   @Builder
   DeviceListSection() {
     if (this.vm.devices.length === 0) {
       Column() {
-        // 使用 Path 绘制简单的蓝牙图标，替代缺失的图片资源
         Stack() {
           Circle({ width: 60, height: 60 })
             .fill('#F5F5F5')
@@ -221,7 +222,7 @@ struct Index {
                   .textOverflow({ overflow: TextOverflow.Ellipsis })
 
                 Text(item.id)
-                  .fontSize(11) // 略微调大ID字体
+                  .fontSize(11) 
                   .fontColor('#999')
                   .margin({ top: 3 })
               }
@@ -247,16 +248,16 @@ struct Index {
             }
             .width('100%')
             .padding(12)
-            .backgroundColor(Color.White) // 卡片背景
+            .backgroundColor(Color.White) 
             .borderRadius(8)
-            .shadow({ radius: 2, color: '#1a000000', offsetY: 1 }) // 轻微阴影
+            .shadow({ radius: 2, color: '#1a000000', offsetY: 1 }) 
           }
           .onClick(() => { this.vm.onSelectDevice(item); })
         }, (item: BleDevice) => item.id)
       }
       .height('55%')
       .width('100%')
-      .edgeEffect(EdgeEffect.Spring) // 增加回弹效果
+      .edgeEffect(EdgeEffect.Spring) 
     }
   }
 
@@ -316,11 +317,12 @@ struct Index {
             .fontSize(FONT_SIZE_NORMAL)
             .margin({ bottom: 4 })
             .onClick(async () => {
-              const ctx = getContext(this) as common.UIAbilityContext;
+              // ⭐ 修复警告：使用 API 13 专用的 getHostContext
+              const ctx = this.getUIContext().getHostContext() as common.UIAbilityContext;
               await this.vm.saveCurrentRecv(ctx);
             })
 
-          Button('复制接收数据') // ⭐ 修复：现在点击此按钮会调用系统剪贴板
+          Button('复制接收数据') 
             .fontSize(FONT_SIZE_NORMAL)
             .onClick(() => {
               this.vm.copyRecvToArea();
@@ -435,7 +437,7 @@ struct Index {
         Slider({
           value: this.vm.otaDelayMs,
           min: 0,
-          max: 200, // ⭐ 修改：最大延时改为 200ms
+          max: 200, 
           step: 10,
           style: SliderStyle.OutSet
         })
@@ -444,12 +446,12 @@ struct Index {
           .selectedColor(COLOR_PRIMARY)
           .showSteps(true)
           .layoutWeight(2)
-          .onChange((value: number, mode: SliderChangeMode) => {
+          // ⭐ 修复警告：移除未使用的 mode 参数
+          .onChange((value: number) => {
             this.vm.otaDelayMs = Math.round(value);
           })
       }.width('100%').margin({bottom: 8})
 
-      // ⭐ 新增：单包大小控制 (64 - 256)
       Row() {
         Text(`单包大小: ${this.vm.otaPacketSize} Bytes`)
           .fontSize(FONT_SIZE_NORMAL)
@@ -458,8 +460,8 @@ struct Index {
         Slider({
           value: this.vm.otaPacketSize,
           min: 64,
-          max: 256, // 解锁到 256
-          step: 64, // 建议按 64 倍数调整
+          max: 256, 
+          step: 64, 
           style: SliderStyle.OutSet
         })
           .blockColor(COLOR_PRIMARY)
@@ -467,7 +469,8 @@ struct Index {
           .selectedColor(COLOR_PRIMARY)
           .showSteps(true)
           .layoutWeight(2)
-          .onChange((value: number, mode: SliderChangeMode) => {
+          // ⭐ 修复警告：移除未使用的 mode 参数
+          .onChange((value: number) => {
             this.vm.otaPacketSize = Math.round(value);
           })
       }.width('100%').margin({bottom: 8})
@@ -525,7 +528,7 @@ struct Index {
               this.vm.message = '当前发送模式： HEX';
             })
 
-          Button('清空发送') // ⭐ 修改：文字改为“清空发送”
+          Button('清空发送') 
             .fontSize(FONT_SIZE_NORMAL)
             .width(80)
             .onClick(() => { this.vm.sendText = ''; })
@@ -739,15 +742,12 @@ struct Index {
   @Builder
   BottomControlSection() {
     Column() {
-      // ⭐ 移除：原本用于展示“复制内容”的区域已删除
-
       // ⭐ OTA 进度条 (只有 OTA 进行时显示)
       if (this.vm.isOtaLoading) {
         Column() {
           Row() {
             Text(`OTA 升级中: ${this.vm.otaProgress}%`).fontSize(12).fontColor(COLOR_PRIMARY)
             Blank()
-            // ⭐ 显示实时耗时
             Text(`耗时: ${this.vm.otaCostTime} s`).fontSize(12).fontColor('#666')
           }.width('100%').justifyContent(FlexAlign.Start)
 
@@ -803,10 +803,11 @@ struct Index {
         Button('OTA 升级')
           .fontSize(FONT_SIZE_NORMAL)
           .height(32)
-          .backgroundColor('#FF9800') // 橙色区分
+          .backgroundColor('#FF9800') 
           .fontColor(Color.White)
           .onClick(() => {
-            const ctx = getContext(this) as common.UIAbilityContext;
+            // ⭐ 修复警告：使用 API 13 专用的 getHostContext
+            const ctx = this.getUIContext().getHostContext() as common.UIAbilityContext;
             this.vm.pickFileAndStartOTA(ctx);
           })
       }
@@ -892,6 +893,7 @@ struct Index {
       }
       .layoutWeight(1)
       .width('100%')
+      .height('100%') // ⭐ 修复警告：补全了 List 缺失的高度声明
 
       Row() {
         Button('取消')
@@ -919,7 +921,7 @@ struct Index {
     .borderRadius(12)
     .padding(16)
     .shadow({ radius: 10, color: '#33000000', offsetY: 4 })
-    .zIndex(1000) // ⭐ 关键修复：提升层级，确保在蒙层之上，且颜色正常
+    .zIndex(1000) 
   }
 
   /* ========== 根 build：左侧收发 + 右侧多字符串 ========== */
@@ -939,7 +941,6 @@ struct Index {
               Row() {
                 Column() {
                   this.ReceivePanelSection();
-                  // ⭐ 新增：OTA 设置放在左侧栏
                   this.OtaSettingsSection();
                   this.SendPanelSection();
                 }
@@ -963,7 +964,6 @@ struct Index {
               Row() {
                 Column() {
                   this.ReceivePanelSection();
-                  // ⭐ 新增：OTA 设置放在左侧栏
                   this.OtaSettingsSection();
                   this.SendPanelSection();
                 }

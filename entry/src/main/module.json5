@@ -4,7 +4,6 @@
     "type": "entry",
     "description": "$string:module_desc",
     "mainElement": "EntryAbility",
-
     "deviceTypes": [
       "phone",
       "tablet",
@@ -55,66 +54,53 @@
             "name": "ohos.extension.backup",
             "resource": "$profile:backup_config"
           }
-        ],
+        ]
       }
     ],
     "requestPermissions": [
       {
         "name": "ohos.permission.ACCESS_BLUETOOTH",
         "reason": "$string:BelManagement",
-        // 说明申请权限的原因（用户可见）
         "usedScene": {
           "abilities": [
             "EntryAbility"
           ],
-          // 关联需要使用该权限的Ability
           "when": "inuse"
-          // 权限使用场景（inuse：使用时申请；always：始终需要）
         }
       },
       {
         "name": "ohos.permission.USE_BLUETOOTH",
         "reason": "$string:UseBel",
-        // 说明申请权限的原因（用户可见）
         "usedScene": {
           "abilities": [
             "EntryAbility"
           ],
-          // 关联需要使用该权限的Ability
           "when": "inuse"
-          // 权限使用场景（inuse：使用时申请；always：始终需要）
         }
       },
       {
-        "name": "ohos.permission.LOCATION",//精确位置
+        "name": "ohos.permission.LOCATION",
         "reason": "$string:UseLOCATION",
-        // 说明申请权限的原因（用户可见）
         "usedScene": {
           "abilities": [
             "EntryAbility"
           ],
-          // 关联需要使用该权限的Ability
           "when": "inuse"
-          // 权限使用场景（inuse：使用时申请；always：始终需要）
         }
       },
       {
-        "name": "ohos.permission.APPROXIMATELY_LOCATION",//大概位置
+        "name": "ohos.permission.APPROXIMATELY_LOCATION",
         "reason": "$string:SearchLOCATION",
-        // 说明申请权限的原因（用户可见）
         "usedScene": {
           "abilities": [
             "EntryAbility"
           ],
-          // 关联需要使用该权限的Ability
           "when": "inuse"
-          // 权限使用场景（inuse：使用时申请；always：始终需要）
         }
       },
       {
         "name": "ohos.permission.INTERNET"
       }
-
     ]
   }
 }

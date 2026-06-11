@@ -107,8 +107,6 @@ export class BleScanManager {
       return '';
     }
 
-    let advertiseFlags: number = -1;
-    let txPowerLevel: number = -1;
     let localName: string = '';
     const serviceUuids: string[] = [];
     const serviceSolicitationUuids: string[] = [];
@@ -130,7 +128,6 @@ export class BleScanManager {
 
       switch (advDataType) {
         case BLE_ADV_TYPE_FLAG:
-          advertiseFlags = advData[curPos];
           break;
         case BLE_ADV_TYPE_LOCAL_NAME_SHORT:
         case BLE_ADV_TYPE_LOCAL_NAME_COMPLETE:
@@ -138,7 +135,6 @@ export class BleScanManager {
           localName = advData.slice(curPos, curPos + advDataLength).toString();
           break;
         case BLE_ADV_TYPE_TX_POWER_LEVEL:
-          txPowerLevel = advData[curPos];
           break;
         case BLE_ADV_TYPE_16_BIT_SERVICE_UUIDS_INCOMPLETE:
         case BLE_ADV_TYPE_16_BIT_SERVICE_UUIDS_COMPLETE:

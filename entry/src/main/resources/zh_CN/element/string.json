@@ -334,7 +334,11 @@
     {
       "name": "home_lang_ja_jp",
       "value": "日本語"
-    }
+    },
+    {
+  "name": "ReadPasteboard",
+  "value": "用于读取剪贴板中的设备注册码进行授权验证"
+}
 
 
 

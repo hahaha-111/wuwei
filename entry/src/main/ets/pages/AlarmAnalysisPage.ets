@@ -213,6 +213,7 @@ struct AlarmAnalysisPage {
                 })
               }
               .width('100%')
+              .height('100%')
               .layoutWeight(1) 
             }
             .constraintSize({ minWidth: '100%' })

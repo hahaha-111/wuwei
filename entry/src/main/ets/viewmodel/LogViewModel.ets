@@ -1,5 +1,5 @@
 import { common } from '@kit.AbilityKit';
-import { promptAction } from '@kit.ArkUI';
+import { UIContext } from '@kit.ArkUI'; // ⭐ 修复：引入 UIContext 替代全局 promptAction
 import { LogManager } from '../common/database/LogManager';
 import { LogEntity, LogCategory } from '../common/database/LogEntity';
 import { MonitorPageParams } from './MonitorViewModel';
@@ -41,6 +41,10 @@ export class LogViewModel {
 
   private context?: common.UIAbilityContext;
   private navParams: MonitorPageParams | undefined = undefined;
+  
+  // ⭐ 注入的界面 UIContext
+  public uiContext: UIContext | null = null;
+  
   // ⭐ 用于页面路由上下文保留的公共属性
   public deviceType: DeviceType = DeviceType.Microwave;
   public connectionMode: 'BLE' | 'TCP' = 'BLE';
@@ -49,11 +53,19 @@ export class LogViewModel {
 
   constructor() {}
 
+  // ⭐ 安全弹窗辅助方法
+  private safeShowToast(msg: string) {
+    if (this.uiContext) {
+      try {
+        this.uiContext.getPromptAction().showToast({ message: msg });
+      } catch (e) {}
+    }
+  }
+
   async init(context: common.UIAbilityContext, params?: MonitorPageParams) {
     this.context = context;
     this.navParams = params;
 
-    // ⭐ 接收全局上下文变量，避免参数丢失
     if (params) {
       if (params.deviceType !== undefined) this.deviceType = params.deviceType;
       if (params.connectionMode !== undefined) this.connectionMode = params.connectionMode;
@@ -61,8 +73,12 @@ export class LogViewModel {
       if (params.deviceName !== undefined) this.deviceNameDisplay = params.deviceName;
     }
 
-    await LogManager.getInstance().init(context);
-    this.refreshLogs();
+    try {
+      await LogManager.getInstance().init(context);
+      this.refreshLogs();
+    } catch (e) {
+      console.error('LogManager init failed', e);
+    }
   }
 
   private getDateKeyFromLog(item: LogEntity): string {
@@ -115,28 +131,32 @@ export class LogViewModel {
   }
 
   async refreshLogs() {
-    const category: string = this.categoryOptions[this.selectedCategoryIndex].value as string;
-    const allLogs: LogEntity[] = await LogManager.getInstance().queryLogs(category);
+    try {
+      const category: string = this.categoryOptions[this.selectedCategoryIndex].value as string;
+      const allLogs: LogEntity[] = await LogManager.getInstance().queryLogs(category);
 
-    let resultList: LogEntity[] = [];
+      let resultList: LogEntity[] = [];
 
-    if (this.filterText && this.filterText.trim().length > 0) {
-      const keyword: string = this.filterText.trim().toLowerCase();
-      resultList = allLogs.filter((item: LogEntity) => {
-        const contentMatch: boolean =
-          !!item.content && item.content.toLowerCase().includes(keyword);
-        const deviceMatch: boolean =
-          !!item.deviceName && item.deviceName.toLowerCase().includes(keyword);
-        const actionMatch: boolean =
-          !!item.actionType && item.actionType.toLowerCase().includes(keyword);
-        return contentMatch || deviceMatch || actionMatch;
-      });
-    } else {
-      resultList = allLogs;
+      if (this.filterText && this.filterText.trim().length > 0) {
+        const keyword: string = this.filterText.trim().toLowerCase();
+        resultList = allLogs.filter((item: LogEntity) => {
+          const contentMatch: boolean =
+            !!item.content && item.content.toLowerCase().includes(keyword);
+          const deviceMatch: boolean =
+            !!item.deviceName && item.deviceName.toLowerCase().includes(keyword);
+          const actionMatch: boolean =
+            !!item.actionType && item.actionType.toLowerCase().includes(keyword);
+          return contentMatch || deviceMatch || actionMatch;
+        });
+      } else {
+        resultList = allLogs;
+      }
+
+      this.logList = resultList;
+      this.rebuildGroups(resultList);
+    } catch (e) {
+      console.error('refreshLogs failed', e);
     }
-
-    this.logList = resultList;
-    this.rebuildGroups(resultList);
   }
 
   onCategorySelect(index: number) {
@@ -162,17 +182,10 @@ export class LogViewModel {
       !oldGroup.expanded
     );
 
-    // 1. 替换对应位置的数据
     this.groupedLogs[index] = newGroup;
-
-    // ⭐ 官方文档状态管理核心修复：
-    // 因为外部使用的是 @State vm = new LogViewModel()，它只能监听到对象第一层属性的“赋值”。
-    // 单纯修改数组内部元素无法改变数组的引用地址，UI 不会更新。
-    // 这里必须通过解构重新分配一个新的数组对象，强制触发 ArkUI 的重绘。
     this.groupedLogs = [...this.groupedLogs];
   }
 
-  // 辅助方法：确保某个分组是展开的（用于跳转后自动展开）
   expandGroup(date: string) {
     const index: number = this.groupedLogs.findIndex((g: LogGroup) => g.date === date);
     if (index >= 0 && !this.groupedLogs[index].expanded) {
@@ -180,9 +193,6 @@ export class LogViewModel {
     }
   }
 
-  /**
-   * 获取目标日期在 List 组件中的真实扁平化索引
-   */
   getFlattenedIndex(dateStr: string): number {
     const targetGroupIndex = this.groupedLogs.findIndex(g => g.date === dateStr);
 
@@ -209,10 +219,16 @@ export class LogViewModel {
   }
 
   async clearLogs() {
-    await LogManager.getInstance().clearAllLogs();
-    this.logList = [];
-    this.groupedLogs = [];
-    promptAction.showToast({ message: '日志已清空' });
+    // ⭐ 修复警告：底层清空方法需要被严密包裹
+    try {
+      await LogManager.getInstance().clearAllLogs();
+      this.logList = [];
+      this.groupedLogs = [];
+      this.safeShowToast('日志已清空');
+    } catch (e) {
+      console.error('clearLogs failed', e);
+      this.safeShowToast('日志清空失败');
+    }
   }
 
   async exportLogs() {
@@ -224,17 +240,22 @@ export class LogViewModel {
       if (path && path.length > 0) {
         const index: number = path.indexOf('/files');
         const shortPath: string = index >= 0 ? path.substring(index) : path;
-        promptAction.showDialog({
-          title: '导出成功',
-          message: `日志已保存至应用私有目录:\n${shortPath}\n\n您可以使用文件管理器查看或连接电脑导出。`,
-          buttons: [{ text: '确定', color: '#1976D2' }]
-        });
+        // ⭐ 修复警告：替换废弃的全局弹窗调用
+        if (this.uiContext) {
+          try {
+            this.uiContext.getPromptAction().showDialog({
+              title: '导出成功',
+              message: `日志已保存至应用私有目录:\n${shortPath}\n\n您可以使用文件管理器查看或连接电脑导出。`,
+              buttons: [{ text: '确定', color: '#1976D2' }]
+            }).catch(() => {});
+          } catch (e) {}
+        }
       } else {
-        promptAction.showToast({ message: '暂无日志可导出' });
+        this.safeShowToast('暂无日志可导出');
       }
     } catch (e) {
-      const msg: string = typeof e === 'string' ? e : JSON.stringify(e);
-      promptAction.showToast({ message: '导出失败: ' + msg });
+      const msg: string = typeof e === 'string' ? e : String(e);
+      this.safeShowToast('导出失败: ' + msg);
     }
   }
 

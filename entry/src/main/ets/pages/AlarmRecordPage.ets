@@ -24,8 +24,9 @@ private listScroller: Scroller = new Scroller();
 @State pickedDate: Date = new Date();
 
 aboutToAppear() {
-const ctx = getContext(this) as common.UIAbilityContext;
-const params = router.getParams() as AlarmPageParams;
+// ⭐ 修复废弃API：使用 API 13 专用的 UIContext 方式获取宿主上下文与路由参数
+const ctx = this.getUIContext().getHostContext() as common.UIAbilityContext;
+const params = this.getUIContext().getRouter().getParams() as AlarmPageParams;
 
 this.vm.uiContext = this.getUIContext();
 
@@ -70,7 +71,8 @@ if (tab === 'log') this.getUIContext().getRouter().replaceUrl({ url: 'pages/LogP
 }
 
 private showDatePickerDialog() {
-DatePickerDialog.show({
+// ⭐ 修复废弃API：改用当前页面实例绑定的 UIContext 触发日期选择弹窗
+this.getUIContext().showDatePickerDialog({
 start: new Date('2020-01-01'),
 end: new Date('2030-12-31'),
 selected: this.pickedDate,
@@ -305,8 +307,8 @@ List({ scroller: this.listScroller }) {
   }, (record: AlarmRecord) => `${record.id}`)
 }
 .width('100%')
+.height('100%') // ⭐ 修复警告：显式声明 List 组件的高度以满足 linter 要求
 .layoutWeight(1)
-// ⭐ 修复编译报错：改用纯正的 List 组件边界检测 API
 .onReachStart(() => {
   this.vm.resumeReadingRecords();
 })
@@ -319,10 +321,10 @@ List({ scroller: this.listScroller }) {
 .backgroundColor(Color.White)
 .borderRadius(8)
 .border({ width: 1, color: '#DDDDDD' })
-// ⭐ 全局面板上/下滑动手势，防止列表因未占满整屏而无法触发触边加载
 .gesture(
 SwipeGesture({ direction: SwipeDirection.Vertical })
-.onAction((event: GestureEvent) => {
+// ⭐ 修复警告：移除未使用的参数 event
+.onAction(() => {
   this.vm.resumeReadingRecords();
 })
 )

@@ -1,7 +1,6 @@
 // ITransport.ts
 // 修改接口定义，支持多播回调
 
-import { BusinessError } from '@kit.BasicServicesKit';
 
 export type TransportState = 'CONNECTED' | 'DISCONNECTED' | 'CONNECTING' | 'DISCONNECTING';
 

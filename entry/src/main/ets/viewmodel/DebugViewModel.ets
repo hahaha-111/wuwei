@@ -5,7 +5,7 @@ import dataPreferences from '@ohos.data.preferences';
 import { BusinessError } from '@ohos.base';
 import { picker } from '@kit.CoreFileKit';
 import { pasteboard } from '@kit.BasicServicesKit';
-import { promptAction } from '@kit.ArkUI';
+import { UIContext } from '@kit.ArkUI'; // ⭐ 替换过时的 promptAction
 import AdapterManager from '../bluetooth/AdapterManager';
 import bleScanManager, { BleDevice } from '../bluetooth/BleSearch';
 import gattClientManager from '../bluetooth/GattClientManager';
@@ -16,17 +16,9 @@ import { ProtocolDecoder } from '../common/ProtocolDecoder';
 import {
   DecodedCommand,
   CommandPayload,
-  StatusPayload,
-  SensitivityPayload,
-  DeviceTimePayload,
-  ChannelPayload,
-  DeviceNamePayload,
-  AlarmThresholdPayload,
-  FiberDataPayload,
-  TempHumidityPayload,
-  VoltagePayload
-} from '../common/protocol/ProtocolTypes';
-import { TcpClient, TcpClientConfig, TcpMessageEvent, TcpClientError } from '../Network/TcpClient';
+  StatusPayload
+} from '../common/protocol/ProtocolTypes'; // ⭐ 移除了未使用的 Payload 类型
+import { TcpClient, TcpMessageEvent } from '../Network/TcpClient'; // ⭐ 移除了未使用的 Error/Config 类型
 import { getSystemInfo } from '../common/DeviceInfoUtil';
 import { StcOtaController } from '../common/ota/StcOtaController';
 
@@ -91,6 +83,8 @@ export class DebugViewModel {
   autoSendEnabled: boolean = false;
   autoSendIntervalText: string = '100';
 
+  public uiContext: UIContext | null = null; // ⭐ 添加 UIContext 引用以支持安全弹窗
+
   // OTA 状态字段
   isOtaLoading: boolean = false;
   otaProgress: number = 0;
@@ -118,11 +112,23 @@ export class DebugViewModel {
   private tcpClient?: TcpClient;
   private autoSendTimer: number = -1;
   private multiAutoTimer: number = -1;
-  private multiAutoCurrentLoop: number = 0;
   private appContext?: common.UIAbilityContext;
 
   // OTA 控制器实例
   private otaController: StcOtaController;
+
+  // ⭐ 核心修复：移除 Record 类型动态拼装，直接使用符合 ShowToastOptions 的对象字面量，且移除 .catch()
+  private showToastMsg(msg: string, duration?: number): void {
+    if (this.uiContext) {
+      try {
+        if (duration !== undefined) {
+          this.uiContext.getPromptAction().showToast({ message: msg, duration: duration });
+        } else {
+          this.uiContext.getPromptAction().showToast({ message: msg });
+        }
+      } catch (e) {}
+    }
+  }
 
   constructor() {
     // 初始化 OTA 控制器
@@ -140,12 +146,12 @@ export class DebugViewModel {
         this.isOtaLoading = false;
         this.otaCostTime = costTime;
         this.message = `OTA 升级成功！耗时 ${costTime} 秒`;
-        try { promptAction.showToast({ message: this.message, duration: 3000 }); } catch (e) {}
+        this.showToastMsg(this.message, 3000); 
       },
       onError: (reason: string): void => {
         this.isOtaLoading = false;
         this.message = 'OTA 失败: ' + reason;
-        try { promptAction.showToast({ message: this.message, duration: 3000 }); } catch (e) {}
+        this.showToastMsg(this.message, 3000); 
       }
     });
   }
@@ -184,7 +190,6 @@ export class DebugViewModel {
     if (decoded.payload instanceof Uint8Array) {
       return `原始数据: ${ProtocolParser.bytesToHexString(decoded.payload)}`;
     }
-    // ⭐ 修复类型转换错误：直接强转为已导入的 CommandPayload，满足 ArkTS 强类型约束
     const payload = decoded.payload as CommandPayload;
     return `Payload Type: ${payload.type}`;
   }
@@ -197,7 +202,8 @@ export class DebugViewModel {
     } catch (_e) {
       encoder = new util.TextEncoder('utf-8');
     }
-    await this.tcpClient.sendHexString(this.bytesToHexString(encoder.encodeInto(text)).toUpperCase());
+    // ⭐ 修复：sendHexString 是同步返回 void 的，去掉前面的 await
+    this.tcpClient.sendHexString(this.bytesToHexString(encoder.encodeInto(text)).toUpperCase());
   }
 
   private async sendDeviceInfoAndConfirmByTcp(): Promise<void> {
@@ -269,9 +275,9 @@ export class DebugViewModel {
 
     let decoder: util.TextDecoder;
     try {
-      decoder = new util.TextDecoder('gb2312');
+      decoder = util.TextDecoder.create('gb2312');
     } catch (_e) {
-      decoder = new util.TextDecoder('utf-8');
+      decoder = util.TextDecoder.create('utf-8');
     }
     const textPart = decoder.decodeToString(data);
     this.tcpReceiveText = this.tcpReceiveText ? `${this.tcpReceiveText}\n[${now}] ${textPart}` : `[${now}] ${textPart}`;
@@ -375,10 +381,12 @@ export class DebugViewModel {
 
   private async sendRawData(data: Uint8Array): Promise<void> {
     if (this.activeChannel === 'BLE' && this.connectedDeviceId) {
-      await gattClientManager.writeBytes(data);
+      // ⭐ 修复：writeBytes 是同步返回 void 的，去掉前面的 await
+      gattClientManager.writeBytes(data);
     } else if (this.activeChannel === 'TCP' && this.tcpClient?.isConnected) {
       const hex = this.bytesToHexString(data).replace(/\s+/g, '');
-      await this.tcpClient.sendHexString(hex);
+      // ⭐ 修复：sendHexString 是同步返回 void 的，去掉前面的 await
+      this.tcpClient.sendHexString(hex);
     } else {
       throw new Error('设备未连接');
     }
@@ -455,6 +463,7 @@ export class DebugViewModel {
         }
         content += this.getCurrentRecvHexRaw();
       }
+      // ⭐ 修复：put 是 Promise，通过 await 在 try..catch 内安全等待结果，移除错误写法的 catch()
       await preferences.put('last', content);
       await preferences.flush();
       this.message = '接收数据已保存到本地偏好 (recv_log)';
@@ -480,11 +489,7 @@ export class DebugViewModel {
       this.scanning = true;
       this.devices = [];
       bleScanManager.setOnDeviceFoundCallback((d: BleDevice) => {
-        // ⭐ 修复: ArkTS 禁止使用扩展运算符 ... 操作数组
-        // 使用 slice() 浅拷贝数组，然后修改，最后重新赋值给 @State 变量以触发 UI 更新
         const existingIdx = this.devices.findIndex((x: BleDevice) => x.id === d.id);
-
-        // 创建新数组引用
         let newDevices: Array<BleDevice> = [];
         this.devices.forEach((dev) => newDevices.push(dev));
 
@@ -493,10 +498,7 @@ export class DebugViewModel {
         } else {
           newDevices[existingIdx] = d;
         }
-
-        // 重新赋值触发更新
         this.devices = newDevices;
-
         this.message = `已发现 ${this.devices.length} 个 BLE 设备`;
       });
       bleScanManager.startScan();
@@ -583,9 +585,9 @@ export class DebugViewModel {
 
       let decoder: util.TextDecoder;
       try {
-        decoder = new util.TextDecoder('gb2312');
+        decoder = util.TextDecoder.create('gb2312');
       } catch (_e) {
-        decoder = new util.TextDecoder('utf-8');
+        decoder = util.TextDecoder.create('utf-8');
       }
       const textPart = decoder.decodeToString(data);
       this.bleReceiveText = this.bleReceiveText ? `${this.bleReceiveText}\n[${now}] ${textPart}` : `[${now}] ${textPart}`;
@@ -630,17 +632,27 @@ export class DebugViewModel {
 
   private async saveMultiSendConfig(): Promise<void> {
     if (this.appContext) {
-      const p = await dataPreferences.getPreferences(this.appContext, 'cfg');
-      await p.put('list', JSON.stringify(this.multiSendList));
-      await p.flush();
+      try {
+        const p = await dataPreferences.getPreferences(this.appContext, 'cfg');
+        // ⭐ 修复：put 是 Promise，必须使用 await 配合 try...catch，移除无返回值的 .catch()
+        await p.put('list', JSON.stringify(this.multiSendList));
+        await p.flush();
+      } catch (e) {
+        console.error('saveMultiSendConfig error', e);
+      }
     }
   }
 
   private async loadMultiSendConfig(): Promise<void> {
     if (this.appContext) {
-      const p = await dataPreferences.getPreferences(this.appContext, 'cfg');
-      const s = await p.get('list', '') as string;
-      if (s) this.multiSendList = JSON.parse(s);
+      try {
+        const p = await dataPreferences.getPreferences(this.appContext, 'cfg');
+        // ⭐ 修复：get 是 Promise，必须使用 await 获取真实数据
+        const s = await p.get('list', '') as string;
+        if (s) this.multiSendList = JSON.parse(s);
+      } catch (e) {
+        console.error('loadMultiSendConfig error', e);
+      }
     }
   }
 }

@@ -140,6 +140,10 @@ export class ImageGenerator {
     // 构造 Task
     const task = new taskpool.Task(saveTask, samples, info, savePath, width, height);
     // 放入 TaskPool 执行
-    await taskpool.execute(task);
+    try {
+      await taskpool.execute(task);
+    } catch (error) {
+      // TODO: Implement error handling.
+    }
   }
 }

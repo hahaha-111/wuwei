@@ -2,7 +2,6 @@ import dataPreferences from '@ohos.data.preferences';
 import { common } from '@kit.AbilityKit';
 import { util } from '@kit.ArkTS';
 import cryptoFramework from '@ohos.security.cryptoFramework';
-import { BusinessError } from '@ohos.base';
 import { deviceInfo } from '@kit.BasicServicesKit';
 
 // ⭐ 必须与注册机 KeygenPage.ets 保持完全一致
@@ -26,13 +25,12 @@ export interface LicenseCheckResult {
 }
 
 export class LicenseManager {
-  private static context: common.UIAbilityContext | null = null;
   private static prefs: dataPreferences.Preferences | null = null;
   private static cachedMachineSeed: string = '';
 
   /** 初始化，获取 Preferences 实例并加载/生成持久化机器码种子 */
   static async init(context: common.UIAbilityContext) {
-    LicenseManager.context = context;
+    // ⭐ 修复：移除了未使用过的私有 context 变量，消除 'never read' 警告
     if (!LicenseManager.prefs) {
       try {
         LicenseManager.prefs = await dataPreferences.getPreferences(context, PREF_NAME);
@@ -56,11 +54,8 @@ export class LicenseManager {
 
   /** 获取本机机器码 (8位大写字母数字) */
   static getMachineCode(): string {
-    // ⭐ 优化：不再使用 unstable 的 versionId，而是使用持久化的 cachedMachineSeed
     let seed = LicenseManager.cachedMachineSeed;
 
-    // 兜底：如果 init 失败或尚未调用，临时回退到旧逻辑（防止崩溃），
-    // 但建议业务层确保先调用 await init()
     if (!seed) {
       seed = deviceInfo.productModel + 'RODA_FALLBACK';
     }
@@ -76,14 +71,19 @@ export class LicenseManager {
     const res = await LicenseManager.validateLicenseInternal(code, false); // 验证但不消耗次数
     if (res.ok) {
       if (LicenseManager.prefs) {
-        const oldCode = await LicenseManager.prefs.get(KEY_LICENSE_CODE, '');
+        // ⭐ 修复：为会抛出异常的 put/get/flush 添加 try-catch 保护块
+        try {
+          const oldCode = await LicenseManager.prefs.get(KEY_LICENSE_CODE, '');
 
-        await LicenseManager.prefs.put(KEY_LICENSE_CODE, code);
+          await LicenseManager.prefs.put(KEY_LICENSE_CODE, code);
 
-        if (oldCode !== code) {
-          await LicenseManager.prefs.put(KEY_USED_COUNT, 0);
+          if (oldCode !== code) {
+            await LicenseManager.prefs.put(KEY_USED_COUNT, 0);
+          }
+          await LicenseManager.prefs.flush();
+        } catch (e) {
+          console.error('LicenseManager verifyAndSaveLicense failed:', e);
         }
-        await LicenseManager.prefs.flush();
       }
       return true;
     }
@@ -98,7 +98,14 @@ export class LicenseManager {
       return { ok: false, msg: 'Context not ready' };
     }
 
-    const code = await LicenseManager.prefs.get(KEY_LICENSE_CODE, '') as string;
+    let code = '';
+    // ⭐ 修复：处理 get 操作的异常
+    try {
+      code = await LicenseManager.prefs.get(KEY_LICENSE_CODE, '') as string;
+    } catch (e) {
+      return { ok: false, msg: '获取授权信息异常' };
+    }
+
     if (!code) {
       return { ok: false, msg: '无授权记录' };
     }
@@ -107,9 +114,14 @@ export class LicenseManager {
     const res = await LicenseManager.validateLicenseInternal(code, consume);
 
     if (res.ok && consume) {
-      const currentCount = await LicenseManager.prefs.get(KEY_USED_COUNT, 0) as number;
-      await LicenseManager.prefs.put(KEY_USED_COUNT, currentCount + 1);
-      await LicenseManager.prefs.flush();
+      // ⭐ 修复：处理 put/flush 写入的异常
+      try {
+        const currentCount = await LicenseManager.prefs.get(KEY_USED_COUNT, 0) as number;
+        await LicenseManager.prefs.put(KEY_USED_COUNT, currentCount + 1);
+        await LicenseManager.prefs.flush();
+      } catch (e) {
+        console.error('LicenseManager consume count failed:', e);
+      }
     }
 
     return res;
@@ -157,16 +169,22 @@ export class LicenseManager {
     const systemNow = new Date().getTime();
     let lastRunTime = 0;
     if (LicenseManager.prefs) {
-      lastRunTime = await LicenseManager.prefs.get(KEY_LAST_RUN_TIME, 0) as number;
+      // ⭐ 修复：处理异常
+      try {
+        lastRunTime = await LicenseManager.prefs.get(KEY_LAST_RUN_TIME, 0) as number;
+      } catch (e) {}
     }
 
     let effectiveNow = Math.max(systemNow, lastRunTime);
 
     if (systemNow > lastRunTime && LicenseManager.prefs) {
-      await LicenseManager.prefs.put(KEY_LAST_RUN_TIME, systemNow);
-      if (!dryRun) {
-        await LicenseManager.prefs.flush();
-      }
+      // ⭐ 修复：处理异常
+      try {
+        await LicenseManager.prefs.put(KEY_LAST_RUN_TIME, systemNow);
+        if (!dryRun) {
+          await LicenseManager.prefs.flush();
+        }
+      } catch (e) {}
     }
 
     const diffMs = expireDate.getTime() - effectiveNow;
@@ -182,7 +200,10 @@ export class LicenseManager {
     // 4. 检查次数
     let currentCount = 0;
     if (LicenseManager.prefs) {
-      currentCount = await LicenseManager.prefs.get(KEY_USED_COUNT, 0) as number;
+      // ⭐ 修复：处理异常
+      try {
+        currentCount = await LicenseManager.prefs.get(KEY_USED_COUNT, 0) as number;
+      } catch (error) {}
     }
 
     let runsLeft = -1;

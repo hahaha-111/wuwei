@@ -1,7 +1,7 @@
-import router from '@ohos.router';
+import { UIContext, router } from '@kit.ArkUI'; // ⭐ 修复：统一引入 ArkUI 的安全路由和上下文
 import { detectScreenInfo, ScreenType } from '../common/ScreenTypeHelper';
-import { SignalBoardViewModel, SignalSample } from './SignalBoardViewModel';
-import { ProtocolFrame, DeviceType, ProtocolParser } from '../common/ProtocolParser';
+import { SignalBoardViewModel } from './SignalBoardViewModel';
+import { ProtocolFrame, DeviceType } from '../common/ProtocolParser';
 import { TransportManager } from '../common/transport/TransportManager';
 import { ITransport } from '../common/transport/ITransport';
 import { ProtocolDecoder } from '../common/ProtocolDecoder';
@@ -13,16 +13,13 @@ import {
   DeviceNamePayload,
   AlarmThresholdPayload,
   SensitivityPayload,
-  CalibrateSignalPayload,
   FiberDataPayload,
   TempHumidityPayload,
   VoltagePayload
-} from '../common/protocol/ProtocolTypes';
+} from '../common/protocol/ProtocolTypes'; 
 import { common } from '@kit.AbilityKit';
-import { promptAction } from '@kit.ArkUI';
 import media from '@ohos.multimedia.media';
 import audio from '@ohos.multimedia.audio';
-import { AdapterManager } from '../bluetooth/AdapterManager';
 import { DeviceNameManager } from '../common/DeviceNameManager';
 import { LogManager } from '../common/database/LogManager';
 import { LogCategory } from '../common/database/LogEntity';
@@ -63,7 +60,7 @@ export interface DeviceLogState {
   sensitivity?: number;
   calibrate?: number;
   name?: string;
-  lastSignal?: number; // ⭐ 新增：用于记录上一次的信号值，控制波动记录频率
+  lastSignal?: number; 
 }
 
 export interface RecordFrame {
@@ -86,7 +83,7 @@ export class NavParamsRecord {
   connectionMode?: string;
   deviceAddress?: number;
   baseDir?: string;
-  deviceKind?: DeviceMode; // ⭐ 新增：向下级页面同步当前锁定的细分模式，防止切回时掉档
+  deviceKind?: DeviceMode; 
 }
 
 class LocalProtocolParser {
@@ -215,6 +212,8 @@ export class MonitorViewModel {
   listenEnable: boolean = false;
   listenStatusText: string = '';
 
+  public uiContext: UIContext | null = null; 
+
   private listenStartTime: number = 0;
   private listenCycleStartTime: number = 0;
   private listenTotalCycles: number = 0;
@@ -233,7 +232,6 @@ export class MonitorViewModel {
   private protocolParser: LocalProtocolParser = new LocalProtocolParser();
 
   public currentDeviceAddress: number = 0x01;
-  private lastSentAddress: number = 0x01;
   private lastProbeTime: number = 0;
   private hasSyncedTime: boolean = false;
 
@@ -277,8 +275,18 @@ export class MonitorViewModel {
     this.transport = TransportManager.getInstance().getTransport();
   }
 
-  private bytesToHex(data: Uint8Array): string {
-    return Array.from(data).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
+  private showToastMsg(msg: string, duration?: number): void {
+    if (this.uiContext) {
+      try {
+        if (duration !== undefined) {
+          this.uiContext.getPromptAction().showToast({ message: msg, duration: duration });
+        } else {
+          this.uiContext.getPromptAction().showToast({ message: msg });
+        }
+      } catch (e) {
+        console.error('showToastMsg error:', e);
+      }
+    }
   }
 
   private getLogState(): DeviceLogState {
@@ -300,8 +308,6 @@ export class MonitorViewModel {
   private checkAndLog(type: 'name' | 'channel' | 'threshold', value: string | number) {
     const state = this.getLogState();
     const deviceId = this.transport.getId() || '-';
-    const currentName = this.deviceNameStr;
-    const logInfo: LogDeviceInfo = { name: currentName, id: deviceId };
 
     if (type === 'name') {
       const valStr = String(value);
@@ -362,9 +368,13 @@ export class MonitorViewModel {
   async init(params?: MonitorPageParams, context?: common.UIAbilityContext): Promise<void> {
     this.context = context;
     if (context) {
-      this.initAudioPlayer(context);
-      this.nameManager = await DeviceNameManager.getInstance(context);
-      await LogManager.getInstance().init(context);
+      try {
+        this.initAudioPlayer(context);
+        this.nameManager = await DeviceNameManager.getInstance(context);
+        await LogManager.getInstance().init(context);
+      } catch (e) {
+        console.error('MonitorVM init modules error:', e);
+      }
     }
 
     if (params) {
@@ -373,7 +383,6 @@ export class MonitorViewModel {
         this.isMicrowaveDevice = params.deviceType === DeviceType.Microwave;
       }
       
-      // 🛠️ 优化生命周期恢复逻辑：只要不是新连接，沿用已有锁定的设备细分模式，绝不重置为 UNKNOWN
       if (params.deviceKind && params.deviceKind !== 'UNKNOWN') {
         this.deviceMode = params.deviceKind;
       } else if (params.deviceKind) {
@@ -390,7 +399,6 @@ export class MonitorViewModel {
       }
       if (params.deviceAddress !== undefined) {
         this.currentDeviceAddress = params.deviceAddress;
-        this.lastSentAddress = params.deviceAddress;
       }
       if (params.deviceName) {
         if (this.deviceNameStr !== params.deviceName) {
@@ -447,9 +455,17 @@ export class MonitorViewModel {
     const p = new NavParamsRecord();
     p.deviceName = this.deviceNameStr;
     p.baseDir = '';
-    p.deviceKind = this.deviceMode; // ⭐ 同步传递设备模式状态
-    const options: router.RouterOptions = { url: 'pages/RecordListPage', params: p };
-    router.pushUrl(options).catch((err: Error) => {});
+    p.deviceKind = this.deviceMode; 
+    if (this.uiContext) {
+      // ⭐ 修复：增加对同步调用的异常捕获
+      try {
+        this.uiContext.getRouter().pushUrl({ url: 'pages/RecordListPage', params: p }, router.RouterMode.Standard).catch((err: Error) => {
+          console.error('Router error:', err);
+        });
+      } catch (e) {
+        console.error('Router pushUrl sync error:', e);
+      }
+    }
   }
 
   private sendFrame(cmd: number, data: number[] = [], forceType?: number, forceAddr?: number): void {
@@ -457,7 +473,6 @@ export class MonitorViewModel {
 
     const addr = forceAddr !== undefined ? forceAddr : this.currentDeviceAddress;
     const type = forceType !== undefined ? forceType : (this.deviceType === DeviceType.Fiber ? 0x66 : 0xC9);
-    this.lastSentAddress = addr;
 
     const len = data.length + 1;
     let sum = type + len + cmd;
@@ -467,7 +482,12 @@ export class MonitorViewModel {
     for (let b of data) hex += this.toHex(b);
     hex += this.toHex(cs);
 
-    this.transport.sendHexString(hex).catch((err: Error) => {});
+    // ⭐ 修复：sendHexString 属于同步方法，不返回 Promise，直接 try...catch 捕获异常
+    try {
+      this.transport.sendHexString(hex);
+    } catch (e) {
+      console.error('sendHexString error:', e);
+    }
   }
 
   private syncTimeToDevice(): void {
@@ -505,9 +525,9 @@ export class MonitorViewModel {
         else if (ch === 4) currentSens = this.fiber4Sens;
 
         if (Math.abs(currentSens - targetSens) > 2) {
-          try { promptAction.showToast({ message: '设定失败，请改为软件调灵方式', duration: 3000 }); } catch(err){}
+          this.showToastMsg('设定失败，请改为软件调灵方式', 3000);
         } else {
-          try { promptAction.showToast({ message: '灵敏度调节成功并已保存！' }); } catch(err){}
+          this.showToastMsg('灵敏度调节成功并已保存！');
         }
       }, 800);
     }, 500);
@@ -519,23 +539,23 @@ export class MonitorViewModel {
     } else {
       this.sendFrame(0x07);
     }
-    try { promptAction.showToast({ message: '已下发重启指令' }); } catch(err){}
+    this.showToastMsg('已下发重启指令');
   }
 
   public onSetSensitivityClick() {
     this.lastSetThresholdTime = Date.now();
     if (this.deviceMode === 'TX') {
       this.sendFrame(0x02, [this.sliderValue], 0xC9, 0x01);
-      try { promptAction.showToast({ message: '调节高频电压成功!' }); } catch(err){}
+      this.showToastMsg('调节高频电压成功!');
     } else {
       this.sendFrame(0x05, [this.sliderValue]);
-      try { promptAction.showToast({ message: '阈值已发送' }); } catch (err) {}
+      this.showToastMsg('阈值已发送');
     }
   }
 
   public onTestWaveButtonClickDebug() {
     this.sendFrame(0x0B);
-    try { promptAction.showToast({ message: '已下发巡检指令' }); } catch (err) {}
+    this.showToastMsg('已下发巡检指令');
   }
 
   private readDeviceParams(): void {
@@ -594,7 +614,7 @@ export class MonitorViewModel {
       this.setConnected(isConn);
       if (state === 'DISCONNECTED') {
         this.addLog(LogCategory.CONNECTION, '设备断开', '检测到连接中断', deviceId || '-');
-        try { promptAction.showToast({ message: '设备已断开' }); } catch (err) {}
+        this.showToastMsg('设备已断开');
       } else if (isConn) {
         this.txPollCounter = 0;
         this.deviceMode = 'UNKNOWN';
@@ -793,29 +813,33 @@ export class MonitorViewModel {
       } else if (cmdPayload.type === 'name') {
         const n = cmdPayload as DeviceNamePayload;
 
-        if (this.nameManager && n.deviceIdHex) {
-          this.nameManager.getName(n.deviceIdHex).then((localName: string) => {
-            const finalName = localName ? localName : (n.isConfigured && n.name ? n.name : '[未命名]');
-            if (this.deviceNameStr !== finalName) {
-              this.deviceNameStr = finalName;
-              this.checkAndLog('name', finalName);
-              this.flushPendingLogs();
-            }
-          }).catch(() => {
+        try {
+          if (this.nameManager && n.deviceIdHex) {
+            this.nameManager.getName(n.deviceIdHex).then((localName: string) => {
+              const finalName = localName ? localName : (n.isConfigured && n.name ? n.name : '[未命名]');
+              if (this.deviceNameStr !== finalName) {
+                this.deviceNameStr = finalName;
+                this.checkAndLog('name', finalName);
+                this.flushPendingLogs();
+              }
+            }).catch(() => {
+              const fallbackName = n.isConfigured && n.name ? n.name : '[未命名]';
+              if (this.deviceNameStr !== fallbackName) {
+                this.deviceNameStr = fallbackName;
+                this.checkAndLog('name', fallbackName);
+                this.flushPendingLogs();
+              }
+            });
+          } else {
             const fallbackName = n.isConfigured && n.name ? n.name : '[未命名]';
             if (this.deviceNameStr !== fallbackName) {
               this.deviceNameStr = fallbackName;
               this.checkAndLog('name', fallbackName);
               this.flushPendingLogs();
             }
-          });
-        } else {
-          const fallbackName = n.isConfigured && n.name ? n.name : '[未命名]';
-          if (this.deviceNameStr !== fallbackName) {
-            this.deviceNameStr = fallbackName;
-            this.checkAndLog('name', fallbackName);
-            this.flushPendingLogs();
           }
+        } catch(e) {
+          console.error('getName error:', e);
         }
 
       } else if (cmdPayload.type === 'channel') {
@@ -858,7 +882,9 @@ export class MonitorViewModel {
           } else {
             this.hasSyncedTime = false;
           }
-        } catch (err) {}
+        } catch (e) {
+          console.error('Time sync error:', e);
+        }
       }
     }
   }
@@ -904,8 +930,10 @@ export class MonitorViewModel {
       const pathDir = FileUtil.getStandardPath(this.context, name, '报警图');
       const fileName = FileUtil.generateFileName('.png');
       await ImageGenerator.saveWaveformImage(samples, info, `${pathDir}/${fileName}`);
-      promptAction.showToast({ message: isAuto ? `自动保存报警图成功` : `手动截图已保存` });
-    } catch (err) {}
+      this.showToastMsg(isAuto ? `自动保存报警图成功` : `手动截图已保存`);
+    } catch (e) {
+      console.error('saveAlarmSnapshot error:', e);
+    }
   }
 
   toggleRecording() {
@@ -921,7 +949,7 @@ export class MonitorViewModel {
     this.isRecording = true;
     this.recordBuffer = [];
     this.recordStartTime = Date.now();
-    promptAction.showToast({ message: '开始录像...' });
+    this.showToastMsg('开始录像...');
   }
 
   stopRecording() {
@@ -949,8 +977,27 @@ export class MonitorViewModel {
       const fileName = FileUtil.generateFileName('.json');
       const content = JSON.stringify(this.recordBuffer);
       await FileUtil.writeText(`${pathDir}/${fileName}`, content);
-      promptAction.showToast({ message: `录像已保存` });
-    } catch (err) {}
+      this.showToastMsg(`录像已保存`);
+    } catch (e) {
+      console.error('saveRecordFile error:', e);
+    }
+  }
+
+  private async readFileContent(path: string): Promise<string> {
+    try {
+      const file = await fs.open(path, fs.OpenMode.READ_ONLY);
+      const stat = await fs.stat(file.fd);
+      const buf = new ArrayBuffer(stat.size);
+      await fs.read(file.fd, buf);
+      await fs.close(file);
+
+      const decoder = util.TextDecoder.create('utf-8');
+      return decoder.decodeToString(new Uint8Array(buf));
+    } catch (e) {
+      console.error('readFileContent error:', e);
+      // ⭐ 修复 arkts-limited-throw 警告：统一转换为 Error 对象抛出
+      throw new Error(String(e));
+    }
   }
 
   private async startPlayback(filePath: string) {
@@ -959,7 +1006,7 @@ export class MonitorViewModel {
       const parsedObj = JSON.parse(content) as Object;
       const data = parsedObj as Array<RecordFrame>;
       if (!data || data.length === 0) {
-        try { promptAction.showToast({ message: '录像文件为空' }); } catch(err) {}
+        this.showToastMsg('录像文件为空');
         return;
       }
       this.playbackData = data;
@@ -971,8 +1018,9 @@ export class MonitorViewModel {
       const sec = Math.floor((totalMs % 60000) / 1000);
       this.playbackTotalDuration = `${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
       this.startPlaybackTimer();
-    } catch (err) {
-      try { promptAction.showToast({ message: '无法加载录像' }); } catch(err2) {}
+    } catch (e) {
+      console.error('startPlayback error:', e);
+      this.showToastMsg('无法加载录像');
     }
   }
 
@@ -1038,7 +1086,7 @@ export class MonitorViewModel {
     this.playbackProgress = 100;
     this.alarmOn = false;
     this.stopAlarmSoundImmediate();
-    try { promptAction.showToast({ message: '回放结束' }); } catch(err){}
+    this.showToastMsg('回放结束');
   }
 
   seekPlayback(percent: number) {
@@ -1069,17 +1117,6 @@ export class MonitorViewModel {
     if (this.isPlaybackPaused) {
       this.stopAlarmSoundImmediate();
     }
-  }
-
-  private async readFileContent(path: string): Promise<string> {
-    const file = await fs.open(path, fs.OpenMode.READ_ONLY);
-    const stat = await fs.stat(file.fd);
-    const buf = new ArrayBuffer(stat.size);
-    await fs.read(file.fd, buf);
-    await fs.close(file);
-
-    const decoder = util.TextDecoder.create('utf-8');
-    return decoder.decodeToString(new Uint8Array(buf));
   }
 
   setConnected(connected: boolean): void {
@@ -1186,7 +1223,6 @@ export class MonitorViewModel {
     }
   }
 
-  // 🛠️ 核心修改：锁定发射端 TX 数据流指令
   startWaveCommandTimer(): void {
     if (this.isPlaybackMode) return;
     if (this.waveTimer === -1) {
@@ -1198,13 +1234,11 @@ export class MonitorViewModel {
         } else if (this.deviceMode === 'RX') {
           this.sendFrame(0x0B, [], 0xC9, this.currentDeviceAddress);
         } else if (this.deviceMode === 'TX') {
-          // ⭐ 确认为 TX 后，坚决只发送 0x96 和 0x97 指令，绝不发送巡检码 0x0B，完美解决降级误判
           const sendCmd = this.txPollCounter % 2 === 0 ? 0x96 : 0x97;
           console.info('MonitorVM', `▶ 发送TX查询: cmd=0x${sendCmd.toString(16)} addr=${this.currentDeviceAddress} cnt=${this.txPollCounter}`);
           this.sendFrame(sendCmd, [], 0xC9, this.currentDeviceAddress);
           this.txPollCounter++;
         } else {
-          // 只有最开始 UNKNOWN (混合盲测) 时走交叉模式探路
           const now = Date.now();
           if (now - this.lastProbeTime < 150) return;
           this.lastProbeTime = now;
@@ -1239,14 +1273,15 @@ export class MonitorViewModel {
   async initAudioPlayer(ctx: common.UIAbilityContext) {
     try {
       const info: audio.AudioRendererInfo = {
-        content: audio.ContentType.CONTENT_TYPE_MUSIC,
         usage: audio.StreamUsage.STREAM_USAGE_ALARM,
         rendererFlags: 0
       };
       this.soundPool = await media.createSoundPool(5, info);
       const fd = await ctx.resourceManager.getRawFd('alarm.mp3');
       this.soundId = await this.soundPool.load(fd.fd, fd.offset, fd.length);
-    } catch (err) {}
+    } catch (e) {
+      console.error('initAudioPlayer error:', e);
+    }
   }
 
   checkAndPlaySound() {
@@ -1279,7 +1314,8 @@ export class MonitorViewModel {
         loop: -1, rate: 1, leftVolume: 1, rightVolume: 1, priority: 0
       });
       this.isAudioPlaying = true;
-    } catch (err) {
+    } catch (e) {
+      console.error('playAlarmSoundActual error:', e);
       this.isAudioPlaying = false;
     }
   }
@@ -1290,32 +1326,47 @@ export class MonitorViewModel {
       await this.soundPool.stop(this.streamId);
       this.streamId = -1;
       this.isAudioPlaying = false;
-    } catch (err) {}
+    } catch (e) {
+      console.error('stopAlarmSoundImmediate error:', e);
+    }
   }
 
   releaseAudioPlayer() {
     if (this.soundPool) {
-      try { this.soundPool.release(); } catch (err) {}
+      try { 
+        this.soundPool.release().catch(() => {
+          // TODO: Implement error handling.
+        }); 
+      } catch (e) {
+        console.error('releaseAudioPlayer error:', e);
+      }
       this.soundPool = undefined;
     }
   }
 
   disconnectAndGoHome(): void {
-  try {
     try {
-      this.transport.disconnect();
+      try {
+        this.transport.disconnect();
+      } catch (e) {
+        console.error('[disconnect error]', String(e));
+      }
+
+      if (this.uiContext) {
+        try {
+          this.uiContext.getRouter().replaceUrl({
+            url: 'pages/HomePage'
+          }, router.RouterMode.Standard).catch((e: Error) => {
+            console.error('[router error]', String(e));
+          });
+        } catch(e) {
+          console.error('[router sync replace error]', String(e));
+        }
+      }
     } catch (e) {
-      console.error('[disconnect]', String(e));
+      console.error('[disconnectAndGoHome]', String(e));
     }
-
-    router.replaceUrl({
-      url: 'pages/HomePage'
-    });
-
-  } catch (e) {
-    console.error('[router]', String(e));
   }
-}
 
   openListenDialog() { this.showListenDialog = true; }
   closeListenDialog() { this.showListenDialog = false; }
@@ -1334,7 +1385,7 @@ export class MonitorViewModel {
       this.listenFailCycles = 0;
       this.currentCycleFailed = false;
       this.listenStatusText = '初始化...';
-      try { promptAction.showToast({ message: '监听已启动' }); } catch(err){}
+      this.showToastMsg('监听已启动');
     } else {
       this.listenStatusText = '';
     }
@@ -1343,7 +1394,7 @@ export class MonitorViewModel {
   toggleMute() {
     this.isMute = !this.isMute;
     this.checkAndPlaySound();
-    try { promptAction.showToast({ message: this.isMute ? '已静音' : '声音已开启' }); } catch (err) {}
+    this.showToastMsg(this.isMute ? '已静音' : '声音已开启');
   }
 
   updateThresholdFromInput(v: string) {
@@ -1351,7 +1402,8 @@ export class MonitorViewModel {
     this.lastSetThresholdTime = Date.now();
   }
 
-  updateThresholdFromSlider(v: number, mode?: number) {
+  // ⭐ 修复警告：移除了未被调用的冗余参数 mode?: number
+  updateThresholdFromSlider(v: number) {
     this.sliderValue = v;
     this.lastSetThresholdTime = Date.now();
   }
@@ -1373,7 +1425,6 @@ export class MonitorViewModel {
     }
   }
 
-  // 🛠️ 核心修改：在页面 show 周期恢复时，对发射端直接追加一次温湿度、电压强刷
   onPageShow() {
     if (this.isPlaybackMode) return;
     this.registerDataCallbacks();
@@ -1382,9 +1433,9 @@ export class MonitorViewModel {
       
       if (this.deviceMode === 'TX') {
         console.info('MonitorVM', '发射端页面唤醒，执行高频电压和温湿度强刷');
-        this.sendFrame(0x96, [], 0xC9, 0x01); // 查温湿度
+        this.sendFrame(0x96, [], 0xC9, 0x01); 
         setTimeout(() => {
-          this.sendFrame(0x97, [], 0xC9, 0x01); // 查电压
+          this.sendFrame(0x97, [], 0xC9, 0x01); 
         }, 150);
       } else {
         this.readDeviceParams();
@@ -1433,30 +1484,31 @@ export class MonitorViewModel {
       navParams.deviceType = this.deviceType;
       navParams.connectionMode = this.connectionMode;
       navParams.deviceAddress = this.currentDeviceAddress;
-      navParams.deviceKind = this.deviceMode; // ⭐ 修复：传给下级页面的入参带上锁定的 deviceMode，防止下级页面切回时状态降级
+      navParams.deviceKind = this.deviceMode; 
 
-      switch (idx) {
-        case 1: {
-          const opt1: router.RouterOptions = { url: 'pages/CalibratePage', params: navParams };
-          router.replaceUrl(opt1).catch(() => {});
-          break;
-        }
-        case 2: {
-          const opt2: router.RouterOptions = { url: 'pages/AlarmRecordPage', params: navParams };
-          router.replaceUrl(opt2).catch(() => {});
-          break;
-        }
-        case 3: {
-          const opt3: router.RouterOptions = { url: 'pages/SettingPage', params: navParams };
-          router.replaceUrl(opt3).catch(() => {});
-          break;
-        }
-        case 4: {
-          const opt4: router.RouterOptions = { url: 'pages/LogPage', params: navParams };
-          router.replaceUrl(opt4).catch(() => {});
-          break;
+      if (this.uiContext) {
+        const routerInstance = this.uiContext.getRouter();
+        switch (idx) {
+          case 1: {
+            try { routerInstance.replaceUrl({ url: 'pages/CalibratePage', params: navParams }, router.RouterMode.Standard).catch((e: Error) => { console.error('Router error:', e); }); } catch(e) { console.error('Router error:', e); }
+            break;
+          }
+          case 2: {
+            try { routerInstance.replaceUrl({ url: 'pages/AlarmRecordPage', params: navParams }, router.RouterMode.Standard).catch((e: Error) => { console.error('Router error:', e); }); } catch(e) { console.error('Router error:', e); }
+            break;
+          }
+          case 3: {
+            try { routerInstance.replaceUrl({ url: 'pages/SettingPage', params: navParams }, router.RouterMode.Standard).catch((e: Error) => { console.error('Router error:', e); }); } catch(e) { console.error('Router error:', e); }
+            break;
+          }
+          case 4: {
+            try { routerInstance.replaceUrl({ url: 'pages/LogPage', params: navParams }, router.RouterMode.Standard).catch((e: Error) => { console.error('Router error:', e); }); } catch(e) { console.error('Router error:', e); }
+            break;
+          }
         }
       }
-    } catch (err) {}
+    } catch (err) {
+      console.error('onNavClick error:', err);
+    }
   }
 }

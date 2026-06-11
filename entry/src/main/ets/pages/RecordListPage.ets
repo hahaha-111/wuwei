@@ -1,13 +1,10 @@
-import router from '@ohos.router';
+import { router, UIContext } from '@kit.ArkUI';
 import { fileIo as fs, fileUri } from '@kit.CoreFileKit';
 import { common } from '@kit.AbilityKit';
 import { systemShare } from '@kit.ShareKit';
-import { uniformTypeDescriptor as utd } from '@kit.ArkData';
 import { util } from '@kit.ArkTS';
-import { promptAction } from '@kit.ArkUI';
 
 import { MonitorPageParams } from '../viewmodel/MonitorViewModel';
-import { FileUtil } from '../common/utils/FileUtil';
 
 @Entry
 @Component
@@ -24,21 +21,35 @@ struct RecordListPage {
   @State textContent: string = '';
   @State viewingFileName: string = '';
 
-  // ⭐ 新增：编辑模式状态
+  // 编辑模式状态
   @State isEditMode: boolean = false;
   @State selectedFiles: string[] = [];
 
-  aboutToAppear() {
-    const params = router.getParams() as MonitorPageParams;
-    this.deviceName = params?.deviceName || '未知设备';
+  private uiContext: UIContext | null = null;
 
-    const ctx = getContext(this) as common.UIAbilityContext;
+  aboutToAppear() {
+    this.uiContext = this.getUIContext();
+
+    try {
+      const params = this.getUIContext().getRouter().getParams() as MonitorPageParams;
+      this.deviceName = params?.deviceName || '未知设备';
+    } catch (e) {
+      console.error('getParams error:', e);
+      this.deviceName = '未知设备';
+    }
+
+    const ctx = this.getUIContext().getHostContext() as common.UIAbilityContext;
     this.currentPath = `${ctx.filesDir}/无畏/${this.deviceName}`;
 
-    if (!fs.accessSync(this.currentPath)) {
+    try {
+      fs.accessSync(this.currentPath);
+    } catch (e) {
+      console.error('accessSync failed:', e);
       try {
         fs.mkdirSync(this.currentPath, true);
-      } catch (e) {}
+      } catch (err) {
+        console.error('mkdirSync failed:', err);
+      }
     }
 
     this.refreshList();
@@ -48,9 +59,8 @@ struct RecordListPage {
     this.displayFiles = [];
     // 刷新列表时，重置选择状态
     this.selectedFiles = [];
-    if (!fs.accessSync(this.currentPath)) return;
-
     try {
+      fs.accessSync(this.currentPath);
       const list = fs.listFileSync(this.currentPath);
       // 过滤掉隐藏文件，并简单排序
       this.displayFiles = list.filter(f => !f.startsWith('.')).sort();
@@ -59,13 +69,13 @@ struct RecordListPage {
     }
   }
 
-  // ⭐ 新增：切换编辑模式
+  // 切换编辑模式
   toggleEditMode() {
     this.isEditMode = !this.isEditMode;
     this.selectedFiles = []; // 切换时清空选择
   }
 
-  // ⭐ 新增：全选/取消全选
+  // 全选/取消全选
   toggleSelectAll() {
     if (this.selectedFiles.length === this.displayFiles.length) {
       this.selectedFiles = [];
@@ -74,7 +84,7 @@ struct RecordListPage {
     }
   }
 
-  // ⭐ 新增：切换单个文件选择
+  // 切换单个文件选择
   toggleFileSelection(fileName: string) {
     if (this.selectedFiles.includes(fileName)) {
       this.selectedFiles = this.selectedFiles.filter(f => f !== fileName);
@@ -83,56 +93,69 @@ struct RecordListPage {
     }
   }
 
-  // ⭐ 新增：批量删除
+  // 批量删除
   batchDelete() {
     if (this.selectedFiles.length === 0) return;
 
-    promptAction.showDialog({
-      title: '批量删除',
-      message: `确定要删除选中的 ${this.selectedFiles.length} 个项目吗？`,
-      buttons: [
-        { text: '取消', color: '#666666' },
-        { text: '删除', color: '#E53935' }
-      ]
-    }).then((resp) => {
-      if (resp.index === 1) {
-        let deletedCount = 0;
-        const ctx = getContext(this) as common.UIAbilityContext;
+    if (this.uiContext) {
+      try {
+        this.uiContext.getPromptAction().showDialog({
+          title: '批量删除',
+          message: `确定要删除选中的 ${this.selectedFiles.length} 个项目吗？`,
+          buttons: [
+            { text: '取消', color: '#666666' },
+            { text: '删除', color: '#E53935' }
+          ]
+        }).then((resp) => {
+          if (resp.index === 1) {
+            let deletedCount = 0;
 
-        this.selectedFiles.forEach(fileName => {
-          const fullPath = `${this.currentPath}/${fileName}`;
-          try {
-            const stat = fs.statSync(fullPath);
-            if (stat.isDirectory()) {
-              // 简单处理：尝试删除空文件夹
-              fs.rmdirSync(fullPath);
-            } else {
-              fs.unlinkSync(fullPath);
-            }
-            deletedCount++;
-          } catch (e) {
-            console.error(`Delete ${fileName} failed:`, e);
+            this.selectedFiles.forEach(fileName => {
+              const fullPath = `${this.currentPath}/${fileName}`;
+              try {
+                const stat = fs.statSync(fullPath);
+                if (stat.isDirectory()) {
+                  // 简单处理：尝试删除空文件夹
+                  fs.rmdirSync(fullPath);
+                } else {
+                  fs.unlinkSync(fullPath);
+                }
+                deletedCount++;
+              } catch (e) {
+                console.error(`Delete ${fileName} failed:`, e);
+              }
+            });
+
+            try { this.getUIContext().getPromptAction().showToast({ message: `已删除 ${deletedCount} 个项目` }); } catch (err) { console.error('toast err', err); }
+            this.toggleEditMode(); // 退出编辑模式
+            this.refreshList();
           }
+        }).catch((e: Error) => {
+          console.error('Dialog error', e);
         });
-
-        promptAction.showToast({ message: `已删除 ${deletedCount} 个项目` });
-        this.toggleEditMode(); // 退出编辑模式
-        this.refreshList();
+      } catch (e) {
+        console.error('Dialog sync error', e);
       }
-    });
+    }
   }
 
-  // ⭐ 新增：批量分享
+  // 批量分享
   batchShare() {
     // 过滤掉文件夹，只分享文件
     const filesToShare = this.selectedFiles.filter(f => f.indexOf('.') !== -1);
 
     if (filesToShare.length === 0) {
-      promptAction.showToast({ message: '请选择文件进行分享' });
+      try { this.getUIContext().getPromptAction().showToast({ message: '请选择文件进行分享' }); } catch (err) { console.error(err); }
       return;
     }
 
-    const context = getContext(this) as common.UIAbilityContext;
+    // ⭐ 核心修复：使用扁平化的 Early Return 拦截，完美化解扫描仪因深层嵌套造成的判断失效
+    if (!canIUse('SystemCapability.Share.SystemShare') || !canIUse('SystemCapability.FileManagement.AppFileService.Core')) {
+      try { this.getUIContext().getPromptAction().showToast({ message: '当前系统不支持分享或文件服务功能' }); } catch (err) { console.error(err); }
+      return;
+    }
+
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
 
     try {
       // 构造第一个分享记录
@@ -142,7 +165,7 @@ struct RecordListPage {
 
       let type = 'general.file';
       if (firstFile.endsWith('.png')) type = 'general.image';
-      else if (firstFile.endsWith('.txt') || firstFile.endsWith('.json')) type = 'general.plain-text';
+      else if (firstFile.endsWith('.txt') || firstFile.endsWith('.json') || firstFile.endsWith('.csv')) type = 'general.plain-text';
 
       const shareData = new systemShare.SharedData({
         utd: type,
@@ -159,7 +182,7 @@ struct RecordListPage {
 
         let fileType = 'general.file';
         if (fileName.endsWith('.png')) fileType = 'general.image';
-        else if (fileName.endsWith('.txt') || fileName.endsWith('.json')) fileType = 'general.plain-text';
+        else if (fileName.endsWith('.txt') || fileName.endsWith('.json') || fileName.endsWith('.csv')) fileType = 'general.plain-text';
 
         shareData.addRecord({
           utd: fileType,
@@ -168,44 +191,55 @@ struct RecordListPage {
       }
 
       const controller = new systemShare.ShareController(shareData);
+      
       controller.show(context, {
         previewMode: systemShare.SharePreviewMode.DEFAULT,
         selectionMode: systemShare.SelectionMode.BATCH
+      }).catch((e: Error) => {
+        console.error('Batch share show error:', e);
       });
 
     } catch (e) {
       console.error('Batch share failed:', JSON.stringify(e));
-      promptAction.showToast({ message: '分享调起失败: ' + (e as Error).message });
+      try { this.getUIContext().getPromptAction().showToast({ message: '分享调起失败: ' + (e as Error).message }); } catch (err) { console.error(err); }
     }
   }
 
   // 单个删除（保留原有功能，但在编辑模式下不可用）
   deleteFile(fileName: string) {
     const fullPath = `${this.currentPath}/${fileName}`;
-    promptAction.showDialog({
-      title: '删除确认',
-      message: `确定要永久删除文件 "${fileName}" 吗？`,
-      buttons: [
-        { text: '取消', color: '#666666' },
-        { text: '删除', color: '#E53935' }
-      ]
-    }).then((resp) => {
-      if (resp.index === 1) {
-        try {
-          fs.unlinkSync(fullPath);
-          promptAction.showToast({ message: '文件已删除' });
-          if (this.previewImagePath === fullPath) this.previewImagePath = '';
-          if (this.viewingFileName === fileName) this.isViewingText = false;
-          this.refreshList();
-        } catch (e) {
-          promptAction.showToast({ message: '删除失败: ' + (e as Error).message });
-        }
+    if (this.uiContext) {
+      try {
+        this.uiContext.getPromptAction().showDialog({
+          title: '删除确认',
+          message: `确定要永久删除文件 "${fileName}" 吗？`,
+          buttons: [
+            { text: '取消', color: '#666666' },
+            { text: '删除', color: '#E53935' }
+          ]
+        }).then((resp) => {
+          if (resp.index === 1) {
+            try {
+              fs.unlinkSync(fullPath);
+              try { this.getUIContext().getPromptAction().showToast({ message: '文件已删除' }); } catch (err) { console.error(err); }
+              if (this.previewImagePath === fullPath) this.previewImagePath = '';
+              if (this.viewingFileName === fileName) this.isViewingText = false;
+              this.refreshList();
+            } catch (e) {
+              try { this.getUIContext().getPromptAction().showToast({ message: '删除失败: ' + (e as Error).message }); } catch (err) { console.error(err); }
+            }
+          }
+        }).catch((e: Error) => {
+          console.error('Dialog error', e);
+        });
+      } catch (e) {
+        console.error('Dialog sync error', e);
       }
-    });
+    }
   }
 
   onItemClick(name: string) {
-    // ⭐ 编辑模式下，点击项为选中/取消选中
+    // 编辑模式下，点击项为选中/取消选中
     if (this.isEditMode) {
       this.toggleFileSelection(name);
       return;
@@ -235,20 +269,23 @@ struct RecordListPage {
   }
 
   playVideo(path: string) {
-    const params: MonitorPageParams = {
-      deviceName: this.deviceName,
-      playbackMode: true,
-      playbackFilePath: path
-    };
     let navParams: MonitorPageParams = {
       deviceName: this.deviceName,
       playbackMode: true,
       playbackFilePath: path
     };
-    router.pushUrl({
-      url: 'pages/MonitorPage',
-      params: navParams
-    });
+    if (this.uiContext) {
+      try {
+        this.uiContext.getRouter().pushUrl({
+          url: 'pages/MonitorPage',
+          params: navParams
+        }, router.RouterMode.Standard).catch((e: Error) => {
+          console.error('Router push failed:', e);
+        });
+      } catch (e) {
+        console.error('Router push sync error:', e);
+      }
+    }
   }
 
   readTextFile(path: string): string {
@@ -258,22 +295,28 @@ struct RecordListPage {
       const buf = new ArrayBuffer(stat.size);
       fs.readSync(file.fd, buf);
       fs.closeSync(file);
-      const decoder = new util.TextDecoder();
-      return decoder.decodeWithStream(new Uint8Array(buf));
+      const decoder = util.TextDecoder.create('utf-8');
+      return decoder.decodeToString(new Uint8Array(buf));
     } catch (e) {
       return '读取文件失败: ' + (e as Error).message;
     }
   }
 
   shareFile(fileName: string) {
+    // ⭐ 核心修复：同理，采用扁平化前置校验退出，让 Linter 解析器完美闭环
+    if (!canIUse('SystemCapability.Share.SystemShare') || !canIUse('SystemCapability.FileManagement.AppFileService.Core')) {
+      try { this.getUIContext().getPromptAction().showToast({ message: '当前系统不支持分享或文件服务功能' }); } catch (err) { console.error(err); }
+      return;
+    }
+
     const fullPath = `${this.currentPath}/${fileName}`;
-    const context = getContext(this) as common.UIAbilityContext;
+    const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
 
     try {
       const uri = fileUri.getUriFromPath(fullPath);
       let type = 'general.file';
       if (fileName.endsWith('.png')) type = 'general.image';
-      else if (fileName.endsWith('.json') || fileName.endsWith('.txt')) type = 'general.plain-text';
+      else if (fileName.endsWith('.json') || fileName.endsWith('.txt') || fileName.endsWith('.csv')) type = 'general.plain-text';
 
       const shareData = new systemShare.SharedData({
         utd: type,
@@ -283,15 +326,19 @@ struct RecordListPage {
       });
 
       const controller = new systemShare.ShareController(shareData);
+      
       controller.show(context, {
         previewMode: systemShare.SharePreviewMode.DEFAULT,
         selectionMode: systemShare.SelectionMode.SINGLE
+      }).catch((e: Error) => {
+        console.error('Share show error:', e);
       });
 
     } catch (e) {
+      console.error('Share error', e);
       try {
-        promptAction.showToast({ message: '分享失败: ' + (e as Error).message });
-      } catch(ignore){}
+        this.getUIContext().getPromptAction().showToast({ message: '分享失败: ' + (e as Error).message });
+      } catch (ignore) { console.error(ignore); }
     }
   }
 
@@ -303,7 +350,7 @@ struct RecordListPage {
         Row() {
           Button('< 返回')
             .onClick(() => {
-              const ctx = getContext(this) as common.UIAbilityContext;
+              const ctx = this.getUIContext().getHostContext() as common.UIAbilityContext;
               const root = `${ctx.filesDir}/无畏/${this.deviceName}`;
 
               // 如果在编辑模式，优先退出编辑模式
@@ -317,7 +364,11 @@ struct RecordListPage {
                 this.currentPath = this.currentPath.substring(0, idx);
                 this.refreshList();
               } else {
-                router.back();
+                try {
+                  this.getUIContext().getRouter().back();
+                } catch (e) {
+                  console.error('Router back failed', e);
+                }
               }
             })
             .backgroundColor(Color.Transparent)
@@ -330,7 +381,7 @@ struct RecordListPage {
 
           Blank()
 
-          // ⭐ 新增：管理按钮
+          // 管理按钮
           Button(this.isEditMode ? '取消' : '管理')
             .fontSize(16)
             .backgroundColor(Color.Transparent)
@@ -361,7 +412,7 @@ struct RecordListPage {
           ForEach(this.displayFiles, (item: string) => {
             ListItem() {
               Row() {
-                // ⭐ 编辑模式：显示复选框
+                // 编辑模式：显示复选框
                 if (this.isEditMode) {
                   Checkbox()
                     .select(this.selectedFiles.includes(item))
@@ -385,7 +436,7 @@ struct RecordListPage {
                 .alignItems(HorizontalAlign.Start)
                 .onClick(() => this.onItemClick(item)) // 点击整行也能触发
 
-                // ⭐ 非编辑模式：显示操作按钮
+                // 非编辑模式：显示操作按钮
                 if (!this.isEditMode && item.indexOf('.') !== -1) {
                   Button('分享')
                     .fontSize(12)
@@ -421,8 +472,9 @@ struct RecordListPage {
         }
         .layoutWeight(1)
         .width('100%')
+        .height('100%')
 
-        // ⭐ 新增：底部批量操作栏
+        // 底部批量操作栏
         if (this.isEditMode) {
           Row() {
             Row() {
