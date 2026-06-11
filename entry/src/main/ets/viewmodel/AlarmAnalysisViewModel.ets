@@ -2,13 +2,13 @@
 import { TcpClient, TcpMessageEvent } from '../Network/TcpClient';
 import { TcpDeviceManager } from '../Network/TcpDeviceManager';
 import { getSystemInfo } from '../common/DeviceInfoUtil';
-import { UIContext, router } from '@kit.ArkUI'; // ⭐ 修改：导入 UIContext，统一配合 API 13 路由与弹窗
+import { UIContext } from '@kit.ArkUI'; // ⭐ 修改：导入 UIContext，统一配合 API 13 路由与弹窗
 import { BusinessError } from '@ohos.base';
 import { util } from '@kit.ArkTS';
 import { common } from '@kit.AbilityKit'; 
 
 import { TcpTransport } from '../common/transport/TcpTransport';
-import { ProtocolParser, ProtocolFrame, DeviceType } from '../common/ProtocolParser';
+import { ProtocolParser, ProtocolFrame } from '../common/ProtocolParser';
 import { FileUtil } from '../common/utils/FileUtil';
 
 export interface AlarmRowData {

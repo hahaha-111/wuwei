@@ -1,11 +1,7 @@
 import { ProtocolDecoder } from '../common/ProtocolDecoder';
 import { StatusPayload, CalibrateSignalPayload, CommandPayload } from '../common/protocol/ProtocolTypes';
 import { ProtocolFrame, DeviceType, ProtocolParser } from '../common/ProtocolParser';
-import { common } from '@kit.AbilityKit';
-import { constant } from '@kit.ConnectivityKit';
-import { BusinessError } from '@kit.BasicServicesKit';
-import { promptAction } from '@kit.ArkUI';
-import { MonitorPageParams } from '../viewmodel/MonitorViewModel';
+import { UIContext } from '@kit.ArkUI'; 
 import { ScreenType } from '../common/ScreenTypeHelper';
 import { TransportManager } from '../common/transport/TransportManager';
 import { ITransport } from '../common/transport/ITransport';
@@ -31,15 +27,12 @@ export class SignalCalibrateViewModel {
   lastUpdateTime: string = '--:--:--';
 
   isCalibrating: boolean = false;
-  // ⭐ 统一使用内部 Parser
   private protocolParser: ProtocolParser = new ProtocolParser();
   private transport: ITransport;
 
   private signalBuffer: number[] = [];
   private lastUiUpdate: number = 0;
   private readonly UI_UPDATE_INTERVAL = 100;
-
-  private context?: common.UIAbilityContext;
 
   private deviceType: DeviceType = DeviceType.Microwave;
   private connectionMode: 'BLE' | 'TCP' = 'BLE';
@@ -48,33 +41,43 @@ export class SignalCalibrateViewModel {
   private currentAddress: number = 0x01;
   private lastCalibrationDataTime: number = 0;
 
-  // ⭐ 新增：手动停止标志位，防止残余数据自动触发开启
   private isManuallyStopped: boolean = false;
 
-  // ⭐ 定义唯一监听 Key
   private readonly LISTENER_KEY = 'SignalCalibrateVM';
 
-  // ⭐ 新增：上一次记录的信号值，用于日志去重 (波动 >= 5 才记录)
   private lastLoggedSignal: number = -999;
-
-  // ⭐ 新增：保存设备名称用于日志
   private deviceName: string = '未知设备';
+
+  public uiContext: UIContext | null = null;
 
   constructor() {
     this.transport = TransportManager.getInstance().getTransport();
   }
 
-  init(params: MonitorPageParams, ctx: common.UIAbilityContext) {
-    this.context = ctx;
-    if (params) {
-      this.deviceType = params.deviceType ?? DeviceType.Microwave;
-      this.connectionMode = params.connectionMode ?? 'BLE';
-      if (params.screenType) {
-        this.screenType = params.screenType;
+  private safeShowToast(msg: string) {
+    if (this.uiContext) {
+      try {
+        this.uiContext.getPromptAction().showToast({ message: msg });
+      } catch (e) {
+        console.error('ShowToast error:', e);
       }
-      // ⭐ 获取设备名称
-      if (params.deviceName) {
-        this.deviceName = params.deviceName;
+    }
+  }
+
+  // ⭐ 修复：统一修改为只接收 1 个参数，与页面层完美匹配，且彻底删除了不需要的 context 上下文
+  init(params: Record<string, Object> | undefined) {
+    if (params) {
+      if (params['deviceType'] !== undefined) {
+        this.deviceType = params['deviceType'] as number;
+      }
+      if (params['connectionMode'] !== undefined) {
+        this.connectionMode = params['connectionMode'] as ('BLE' | 'TCP');
+      }
+      if (params['screenType'] !== undefined) {
+        this.screenType = params['screenType'] as ScreenType;
+      }
+      if (params['deviceName'] !== undefined) {
+        this.deviceName = params['deviceName'] as string;
       }
     }
 
@@ -101,7 +104,6 @@ export class SignalCalibrateViewModel {
   }
 
   private checkAndAutoStart(reason: string) {
-    // ⭐ 修复：使用标志位判断，替代不稳定的 tipText 字符串匹配
     if (this.isCalibrating === false && this.isManuallyStopped) {
       return;
     }
@@ -122,17 +124,17 @@ export class SignalCalibrateViewModel {
     }
   }
 
-  getNavParams(): MonitorPageParams {
-    return {
-      deviceType: this.deviceType,
-      connectionMode: this.connectionMode,
-      screenType: this.screenType,
-      deviceName: this.deviceName // 传递回去
-    };
+  getNavParams(): Record<string, Object> {
+    const p: Record<string, Object> = {};
+    p['deviceType'] = this.deviceType;
+    p['connectionMode'] = this.connectionMode;
+    p['screenType'] = this.screenType;
+    p['deviceName'] = this.deviceName;
+    return p;
   }
 
-  onAppear(ctx?: common.UIAbilityContext) {
-    if (ctx) this.context = ctx;
+  // ⭐ 修复：彻底清理废弃的参数接收
+  onAppear() {
     this.registerCallbacks();
   }
 
@@ -146,12 +148,10 @@ export class SignalCalibrateViewModel {
     if (this.isCalibrating) {
       this.stopCalibration();
     }
-    // ⭐ 注销监听
     this.transport.offDataReceived(this.LISTENER_KEY);
   }
 
   public registerCallbacks() {
-    // ⭐ 统一使用多播监听
     this.transport.setOnDataReceived(this.LISTENER_KEY, (data: Uint8Array) => {
       const frames = this.protocolParser.feed(data);
       frames.forEach((frame): void => this.handleFrame(frame));
@@ -181,7 +181,6 @@ export class SignalCalibrateViewModel {
         if (decoded.cmd === 0x01 && cmdPayload.type === 'calibrateSignal') {
           this.lastCalibrationDataTime = Date.now();
 
-          // ⭐ 核心修复：如果用户已手动停止，忽略残余的校准数据，不自动恢复状态
           if (this.isManuallyStopped) {
             return;
           }
@@ -194,7 +193,6 @@ export class SignalCalibrateViewModel {
         }
         else if (cmdPayload.type === 'status') {
           const p = cmdPayload as StatusPayload;
-          // 状态包的数据即使在停止时也可以更新显示，但不改变校准状态
           this.processSignalValue(p.signal);
         }
       }
@@ -211,16 +209,14 @@ export class SignalCalibrateViewModel {
       this.flushUiUpdate(now);
     }
 
-    // ⭐⭐ 日志记录逻辑：波动过滤 (>=5) ⭐⭐
     if (this.isCalibrating) {
-      // 如果是首次记录 (-999) 或者 波动超过 5，则记录
       const diff = Math.abs(signal - this.lastLoggedSignal);
       if (this.lastLoggedSignal === -999 || diff >= 5) {
         LogManager.getInstance().addLog(
           LogCategory.MAINTENANCE,
           '校准信号',
           `数值: ${signal}`,
-          { name: this.deviceName, id: this.transport.getId() }
+          { name: this.deviceName, id: this.transport.getId() || '-' }
         );
         this.lastLoggedSignal = signal;
       }
@@ -258,7 +254,6 @@ export class SignalCalibrateViewModel {
     const d = new Date();
     this.lastUpdateTime = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}:${d.getSeconds().toString().padStart(2, '0')}`;
 
-    // 只有在非手动停止（即正常校准或监听状态）时才更新提示文字
     if (!this.isManuallyStopped) {
       this.tipText = `正在校准... 当前信号: ${this.currentSignal} / 最大值: ${this.maxSignal}`;
     }
@@ -296,7 +291,7 @@ export class SignalCalibrateViewModel {
 
   startCalibration() {
     if (!this.transport.isConnected()) {
-      try { promptAction.showToast({ message: '设备未连接' }); } catch(e){}
+      this.safeShowToast('设备未连接');
       return;
     }
 
@@ -310,10 +305,8 @@ export class SignalCalibrateViewModel {
       this.peakTime = '--:--:--';
     }
 
-    // ⭐ 重置手动停止标志
     this.isManuallyStopped = false;
     this.isCalibrating = true;
-    // ⭐ 重置日志去重基准，确保重新开始时能记录当前值
     this.lastLoggedSignal = -999;
 
     this.tipText = '发送校准指令...';
@@ -321,7 +314,7 @@ export class SignalCalibrateViewModel {
     const hex = this.buildCommand(0x01, 0x01, []);
     this.sendHex(hex);
 
-    try { promptAction.showToast({ message: '开始校准' }); } catch(e){}
+    this.safeShowToast('开始校准');
   }
 
   stopCalibration() {
@@ -330,11 +323,11 @@ export class SignalCalibrateViewModel {
     const hex = this.buildCommand(0x02, 0x01, [0x87]);
     this.sendHex(hex);
 
-    // ⭐ 设置手动停止标志，阻止自动恢复
     this.isManuallyStopped = true;
     this.isCalibrating = false;
     this.tipText = `校准已停止。最大信号：${this.maxSignal}`;
-    try { promptAction.showToast({ message: '停止校准' }); } catch(e){}
+    
+    this.safeShowToast('停止校准');
   }
 
   private toHex(n: number): string {

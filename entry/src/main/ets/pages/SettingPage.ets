@@ -1,10 +1,9 @@
 // pages/SettingPage.ets
-import router from '@ohos.router';
+import { router } from '@kit.ArkUI'; // ⭐ 修复：统一使用 ArkUI 下的安全路由
 import { common } from '@kit.AbilityKit';
 import { SettingViewModel, SettingPageParams } from '../viewmodel/SettingViewModel';
 import { detectScreenInfo } from '../common/ScreenTypeHelper';
 import { DeviceType } from '../common/ProtocolParser';
-import { promptAction } from '@kit.ArkUI';
 
 @Extend(Text) function navLabel(active: boolean) {
   .fontSize(16)
@@ -55,8 +54,9 @@ struct SettingPage {
   private currentTab: string = 'setting';
 
   aboutToAppear() {
-    const ctx = getContext(this) as common.UIAbilityContext;
-    const params = router.getParams() as SettingPageParams;
+    // ⭐ 修复警告：使用 API 13 专用的 getHostContext 和 UIContext 路由参数获取方式
+    const ctx = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    const params = this.getUIContext().getRouter().getParams() as SettingPageParams;
     this.vm.init(params, ctx);
     this.adaptScreen();
   }
@@ -89,7 +89,8 @@ struct SettingPage {
       return;
     }
     if (tab === 'calibrate' && this.vm.deviceType !== DeviceType.Microwave) {
-      try { promptAction.showToast({ message: '当前设备不支持校准功能' }); } catch (err) {}
+      // ⭐ 修复警告：替换废弃的全局 promptAction
+      try { this.getUIContext().getPromptAction().showToast({ message: '当前设备不支持校准功能' }); } catch (err) {}
       return;
     }
 
@@ -104,17 +105,20 @@ struct SettingPage {
       deviceAddress: this.vm.currentAddress
     };
 
+    const uiRouter = this.getUIContext().getRouter();
+
+    // ⭐ 修复警告：使用 UIContext 的 router 方法，并明确指定 Standard 模式
     if (tab === 'home') {
-      router.replaceUrl({ url: 'pages/MonitorPage', params: navParams }).catch(() => {});
+      uiRouter.replaceUrl({ url: 'pages/MonitorPage', params: navParams }, router.RouterMode.Standard).catch(() => {});
     }
     if (tab === 'calibrate') {
-      router.replaceUrl({ url: 'pages/CalibratePage', params: navParams }).catch(() => {});
+      uiRouter.replaceUrl({ url: 'pages/CalibratePage', params: navParams }, router.RouterMode.Standard).catch(() => {});
     }
     if (tab === 'alarm') {
-      router.replaceUrl({ url: 'pages/AlarmRecordPage', params: navParams }).catch(() => {});
+      uiRouter.replaceUrl({ url: 'pages/AlarmRecordPage', params: navParams }, router.RouterMode.Standard).catch(() => {});
     }
     if (tab === 'log') {
-      router.replaceUrl({ url: 'pages/LogPage', params: navParams }).catch(() => {});
+      uiRouter.replaceUrl({ url: 'pages/LogPage', params: navParams }, router.RouterMode.Standard).catch(() => {});
     }
   }
 
@@ -602,8 +606,8 @@ struct SettingPage {
                 connectionMode: this.vm.connectionMode,
                 deviceAddress: this.vm.currentAddress
               };
-              // 跳转到专门的滤波高级设置界面
-              router.pushUrl({ url: 'pages/FilterSettingPage', params: navParams }).catch(() => {});
+              // ⭐ 修复警告：使用 UIContext 触发的 pushUrl，并加上 Standard 模式
+              this.getUIContext().getRouter().pushUrl({ url: 'pages/FilterSettingPage', params: navParams }, router.RouterMode.Standard).catch(() => {});
             })
         }
 

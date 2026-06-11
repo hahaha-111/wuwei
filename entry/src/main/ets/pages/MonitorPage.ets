@@ -1,5 +1,5 @@
 import { SignalBoard } from '../common/SignalBoard';
-import { MonitorViewModel, MonitorPageParams } from '../viewmodel/MonitorViewModel';
+import { MonitorViewModel } from '../viewmodel/MonitorViewModel';
 import { common } from '@kit.AbilityKit';
 
 @Extend(Text) function navText() { .fontSize(16).fontColor('#444444') }
@@ -89,7 +89,8 @@ struct MonitorPage {
     try {
       this.vm.uiContext = this.getUIContext();
 
-      let params: MonitorPageParams | undefined = this.getUIContext().getRouter().getParams() as MonitorPageParams;
+      // ⭐ 核心修复：彻底解决 arkts-no-structural-typing 导致参数丢失的问题
+      const params = this.getUIContext().getRouter().getParams() as Record<string, Object>;
       const ctx = this.getUIContext().getHostContext() as common.UIAbilityContext;
 
       this.vm.setOnStatusChange((alarm: boolean, tamper: boolean) => {
@@ -124,13 +125,14 @@ struct MonitorPage {
   aboutToDisappear() { this.vm.destroy(); }
 
   private isPhone(): boolean { return this.vm.screenType === 'PHONE'; }
+  private isTablet(): boolean { return this.vm.screenType === 'TABLET'; }
   private isFold(): boolean { return this.vm.screenType === 'FOLD'; }
   private isLargeScreen(): boolean { return this.vm.isLargeScreen; }
 
-  private navHeight(): number { return this.vm.screenType === 'TABLET' ? 72 : (this.isFold() ? 60 : 36); }
-  private sliderWidth(): number { return this.vm.screenType === 'TABLET' ? 160 : 50; }
+  private navHeight(): number { return this.isTablet() ? 72 : (this.isFold() ? 60 : 36); }
+  private sliderWidth(): number { return this.isTablet() ? 160 : 50; }
   private waveTitleTopPadding(): number { return this.isPhone() ? 1 : 2; }
-  private listHeight(): number { return this.vm.screenType === 'TABLET' ? 230 : (this.isFold() ? 240 : 140); }
+  private listHeight(): number { return this.isTablet() ? 230 : (this.isFold() ? 240 : 140); }
   private btnHeight(): number { return this.isPhone() ? 26 : 32; }
   private btnFontSize(): number { return this.isPhone() ? 11 : 13; }
   private bottomRowHeight(): number { return this.isPhone() ? 38 : 50; }
@@ -239,7 +241,7 @@ struct MonitorPage {
       }
       .width('100%').padding({ left: 16, right: 16, top: 0, bottom: 4 })
     }
-    .margin({ top: this.vm.screenType === 'TABLET' ? 18 : (this.isFold() ? 8 : 2) })
+    .margin({ top: this.isTablet() ? 18 : (this.isFold() ? 8 : 2) })
   }
 
   @Builder wavePanel() {
@@ -441,7 +443,6 @@ struct MonitorPage {
         Text(`${this.vm.playbackRate.toFixed(1)}x`).fontSize(14).fontColor('#1976D2')
       }.width('100%').padding({top: 10, bottom: 4})
 
-      // ⭐ 修复警告：移除了未使用到的 mode 回调参数
       Slider({ value: this.vm.playbackRate, min: 0.5, max: 100, step: 0.5 })
         .width('100%')
         .margin({bottom: 20})

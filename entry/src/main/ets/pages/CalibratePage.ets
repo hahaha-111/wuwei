@@ -1,14 +1,9 @@
-import { common } from '@kit.AbilityKit';
-import { router } from '@kit.ArkUI'; // ⭐ 修改：统一使用 ArkUI 下的现代 router API
+import { router } from '@kit.ArkUI'; // ⭐ 修改：只保留需要的路由 API
 import { SignalCalibrateViewModel } from '../viewmodel/SignalCalibrateViewModel';
-import { MonitorPageParams } from '../viewmodel/MonitorViewModel';
 
 @Extend(Text)
 function navLabel(active: boolean) {
   .fontSize(14)
-  // ⭐ 修改：未选中状态颜色加深，提升对比度 (#333333 -> #666666 只是示例，实际需求是更清晰)
-  // 这里保持 #333333 其实对比度尚可，若要更深可用 #222222
-  // 选中状态保持 Blue
   .fontColor(active ? '#1976D2' : '#616161')
   .fontWeight(active ? FontWeight.Bold : FontWeight.Normal)
 }
@@ -34,19 +29,17 @@ struct CalibratePage {
   private peakH: number = 0;
 
   private currentTab: string = 'calibrate';
-  
-  // ⭐ 修复：删除了未被使用的 contextAbility 变量，消除 'never read' 警告
 
   aboutToAppear() {
-    // ⭐ 修复：使用 API 13 专用的 getHostContext 代替已过时的全局 getContext(this)
-    const ctx = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    // ⭐ 修复：为 ViewModel 注入 UIContext，激活高级弹窗能力
+    this.vm.uiContext = this.getUIContext();
 
+    // ⭐ 彻底清理冗余的 Context 变量，完美贴合只有 1 个参数的 init()
     try {
-      // ⭐ 修复：使用 UIContext 下的安全路由获取参数
-      const params = this.getUIContext().getRouter().getParams() as MonitorPageParams;
-      this.vm.init(params, ctx);
+      const params = this.getUIContext().getRouter().getParams() as Record<string, Object>;
+      this.vm.init(params);
     } catch (e) {
-      this.vm.onAppear(ctx);
+      this.vm.onAppear();
     }
   }
 
@@ -237,12 +230,12 @@ struct CalibratePage {
   private goTo(tab: string) {
     if (tab === this.currentTab) return;
 
-    this.vm.stopCalibration(); // 切换前发送退出指令
+    this.vm.stopCalibration();
 
     const params = this.vm.getNavParams();
     const routerInstance = this.getUIContext().getRouter();
     
-    // ⭐ 修复：直接挂载 .catch()，接管 Promise 的异常抛出，同时满足 Standard 路由模式和严格语法
+    // ⭐ 修复：直接挂载 .catch()，接管 Promise 异常，指定 Standard 模式
     switch (tab) {
       case 'home':
         routerInstance.replaceUrl({ url: 'pages/MonitorPage', params: params }, router.RouterMode.Standard).catch(() => {});
@@ -270,7 +263,6 @@ struct CalibratePage {
     }
     .width('100%')
     .height(50)
-    // ⭐ 修改：底部导航背景色加深一点点，提升对比
     .backgroundColor('#F0F0F0')
     .border({ width: { bottom: 1 }, color: '#E0E0E0' })
   }
@@ -379,9 +371,6 @@ struct CalibratePage {
 
       Column() {
         Row() {
-          // ⭐ 修改：优化按钮禁用态的背景色
-          // '开始校准' 禁用时 (isCalibrating=true)：颜色设为较深的灰色 #9E9E9E，而非之前的 #ffbbbbbb (太浅看不清)
-          // 启用时：#4CAF50
           Button(this.vm.isCalibrating ? '校准中...' : '开始校准')
             .enabled(!this.vm.isCalibrating)
             .height(30)
@@ -396,15 +385,13 @@ struct CalibratePage {
           Button('清除最大值')
             .height(30)
             .fontSize(12)
-            .backgroundColor('#B0BEC5') // 稍微深一点的蓝灰
+            .backgroundColor('#B0BEC5')
             .fontColor('#333333')
             .layoutWeight(1)
             .onClick(() => this.vm.clearMax())
 
           Blank().width(8)
 
-          // ⭐ 修改：'停止校准' 禁用时 (isCalibrating=false)：颜色设为较深的灰色 #9E9E9E
-          // 启用时：#E53935
           Button('停止校准')
             .enabled(this.vm.isCalibrating)
             .height(30)
@@ -416,7 +403,6 @@ struct CalibratePage {
         }
         .width('100%')
         .margin({ bottom: 6 })
-
 
       }.padding({ top: 4 })
     }

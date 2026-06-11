@@ -64,6 +64,9 @@ export class HomePageBleViewModel {
   connectedDeviceId: string = '';
   connectStateText: string = '';
 
+  // ⭐ 新增：记录被选中的列表名称
+  selectedDeviceName: string = '';
+
   versionName: string = '';
 
   staMode: boolean = false;
@@ -113,7 +116,6 @@ export class HomePageBleViewModel {
 
   private localParser: ProtocolParser = new ProtocolParser();
 
-  // ⭐ 修复编译报错：直接传递强类型字面量给 showToast，去除 .catch() 以符合返回 void 的签名
   private showToastMsg(msg: string, duration?: number): void {
     if (this.uiContext) {
       try {
@@ -454,7 +456,9 @@ export class HomePageBleViewModel {
           screenType: this.screenType,
           deviceType: deviceType,
           deviceKind: deviceKind,
-          connectionMode: (this.staMode || this.tcpMode) ? 'TCP' : 'BLE'
+          connectionMode: (this.staMode || this.tcpMode) ? 'TCP' : 'BLE',
+          // ⭐ 传递点击列表时选择的名称
+          deviceName: this.selectedDeviceName 
         }
       }, router.RouterMode.Standard).catch(() => {});
     }
@@ -481,6 +485,10 @@ export class HomePageBleViewModel {
     this.stopBleScan();
     this.closeTcpListClient();
     if (!await this.ensureAuthorized(false)) return;
+
+    // ⭐ 在点击设备时，记录用户点击的列表名称
+    this.selectedDeviceName = item.name;
+
     this.updateDeviceStatus(item.id, this.getString($r('app.string.device_status_connecting'), '正在连接'));
     this.searchTip = this.getStringFmt($r('app.string.home_search_tip_connecting'), [item.name], `正在连接: ${item.name}`);
 
@@ -578,7 +586,6 @@ export class HomePageBleViewModel {
     this.tcpListClient.setOnMessage((event: TcpMessageEvent) => {
       const data = new Uint8Array(event.message);
       try {
-        // ⭐ 修复：统一替换遗留的过时 API 为官方强力推介的静态工厂方法
         const decoder = util.TextDecoder.create('gbk', { ignoreBOM: true });
         this.receiveBuffer += decoder.decodeToString(data);
       } catch (e) {}
@@ -662,7 +669,6 @@ export class HomePageBleViewModel {
       const data = new Uint8Array(event.message);
       let text = '';
       try {
-        // ⭐ 修复：统一替换遗留的过时 api 调用
         const decoder = util.TextDecoder.create('gbk', { ignoreBOM: true });
         text = decoder.decodeToString(data);
       } catch (e) {}
@@ -877,6 +883,7 @@ export class HomePageBleViewModel {
     if (!this.machineCode) return;
     try {
       const data = pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, this.machineCode);
+    
       await pasteboard.getSystemPasteboard().setData(data);
       this.showToastMsg(this.getString($r('app.string.toast_copy_machine_code_success'), '已复制')); 
     } catch (e) {
@@ -886,6 +893,7 @@ export class HomePageBleViewModel {
 
   async pasteRegisterCode(): Promise<void> {
     try {
+    
       const data = await pasteboard.getSystemPasteboard().getData();
       if (data) {
         const text = data.getPrimaryText();

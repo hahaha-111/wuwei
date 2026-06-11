@@ -1,6 +1,5 @@
 import { common } from '@kit.AbilityKit';
 import { promptAction } from '@kit.ArkUI';
-import { util } from '@kit.ArkTS';
 
 import { TransportManager } from '../common/transport/TransportManager';
 import { ITransport } from '../common/transport/ITransport';
@@ -88,7 +87,6 @@ export class SettingViewModel {
   connectionTypeDisplay: string = 'BLE';
   tipText: string = '请先从设备读取参数';
 
-  private context: common.UIAbilityContext | null = null;
   private transport: ITransport;
 
   public deviceType: DeviceType = DeviceType.Microwave;
@@ -111,14 +109,10 @@ export class SettingViewModel {
     this.transport = TransportManager.getInstance().getTransport();
   }
 
-  private bytesToHex(data: Uint8Array): string {
-    return Array.from(data).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
-  }
 
   // ================= 生命周期 =================
   async init(params: SettingPageParams | undefined, ctx?: common.UIAbilityContext): Promise<void> {
     if (ctx !== undefined) {
-      this.context = ctx;
       this.nameManager = await DeviceNameManager.getInstance(ctx);
       await LogManager.getInstance().init(ctx);
     }
@@ -327,7 +321,11 @@ export class SettingViewModel {
 
   async applyDeviceName(): Promise<void> {
     if (!this.transport.isConnected()) {
-      promptAction.showToast({ message: '请先连接设备' });
+      try {
+        promptAction.showToast({ message: '请先连接设备' });
+      } catch (error) {
+        // TODO: Implement error handling.
+      }
       return;
     }
     if (!this.nameManager) return;

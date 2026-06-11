@@ -1,4 +1,4 @@
-import { UIContext, router } from '@kit.ArkUI'; // ⭐ 修复：统一引入 ArkUI 的安全路由和上下文
+import { UIContext, router } from '@kit.ArkUI'; 
 import { detectScreenInfo, ScreenType } from '../common/ScreenTypeHelper';
 import { SignalBoardViewModel } from './SignalBoardViewModel';
 import { ProtocolFrame, DeviceType } from '../common/ProtocolParser';
@@ -31,7 +31,8 @@ import { ImageGenerator, SnapshotInfo } from '../common/utils/ImageGenerator';
 export type DeviceMode = 'RX' | 'TX' | 'FIBER' | 'UNKNOWN';
 export type FiberChannelMode = 'ALL' | 'CH1' | 'CH2' | 'CH3' | 'CH4';
 
-export interface MonitorPageParams {
+// ⭐ 修复编译报错：恢复路由对象，且改为 class 防止被严格模式识别为结构化隐式转换
+export class MonitorPageParams {
   screenType?: ScreenType;
   deviceType?: DeviceType;
   deviceKind?: DeviceMode;
@@ -40,6 +41,18 @@ export interface MonitorPageParams {
   deviceAddress?: number;
   playbackMode?: boolean;
   playbackFilePath?: string;
+  port?: string;
+  fromPage?: string;
+}
+
+export class NavParamsRecord {
+  deviceName?: string;
+  deviceType?: number;
+  screenType?: string;
+  connectionMode?: string;
+  deviceAddress?: number;
+  baseDir?: string;
+  deviceKind?: DeviceMode; 
 }
 
 export interface ParamItem {
@@ -74,16 +87,6 @@ export interface RecordFrame {
 export interface LogDeviceInfo {
   name: string;
   id: string;
-}
-
-export class NavParamsRecord {
-  deviceName?: string;
-  deviceType?: number;
-  screenType?: string;
-  connectionMode?: string;
-  deviceAddress?: number;
-  baseDir?: string;
-  deviceKind?: DeviceMode; 
 }
 
 class LocalProtocolParser {
@@ -365,7 +368,7 @@ export class MonitorViewModel {
     }
   }
 
-  async init(params?: MonitorPageParams, context?: common.UIAbilityContext): Promise<void> {
+  async init(params?: Record<string, Object>, context?: common.UIAbilityContext): Promise<void> {
     this.context = context;
     if (context) {
       try {
@@ -378,41 +381,42 @@ export class MonitorViewModel {
     }
 
     if (params) {
-      if (params.deviceType !== undefined) {
-        this.deviceType = params.deviceType;
-        this.isMicrowaveDevice = params.deviceType === DeviceType.Microwave;
+      if (params['deviceType'] !== undefined) {
+        this.deviceType = params['deviceType'] as number;
+        this.isMicrowaveDevice = this.deviceType === DeviceType.Microwave;
       }
       
-      if (params.deviceKind && params.deviceKind !== 'UNKNOWN') {
-        this.deviceMode = params.deviceKind;
-      } else if (params.deviceKind) {
-        this.deviceMode = params.deviceKind;
+      if (params['deviceKind'] !== undefined && params['deviceKind'] !== 'UNKNOWN') {
+        this.deviceMode = params['deviceKind'] as DeviceMode;
+      } else if (params['deviceKind']) {
+        this.deviceMode = params['deviceKind'] as DeviceMode;
       }
       
-      if (params.screenType) {
-        this.screenType = params.screenType;
+      if (params['screenType']) {
+        this.screenType = params['screenType'] as ScreenType;
       }
-      if (params.connectionMode) {
-        this.connectionMode = params.connectionMode;
+      if (params['connectionMode']) {
+        this.connectionMode = params['connectionMode'] as ('BLE' | 'TCP');
         TransportManager.getInstance().switchMode(this.connectionMode);
         this.transport = TransportManager.getInstance().getTransport();
       }
-      if (params.deviceAddress !== undefined) {
-        this.currentDeviceAddress = params.deviceAddress;
+      if (params['deviceAddress'] !== undefined) {
+        this.currentDeviceAddress = params['deviceAddress'] as number;
       }
-      if (params.deviceName) {
-        if (this.deviceNameStr !== params.deviceName) {
-          this.deviceNameStr = params.deviceName;
+      if (params['deviceName']) {
+        const pName = params['deviceName'] as string;
+        if (this.deviceNameStr !== pName) {
+          this.deviceNameStr = pName;
         }
       }
-      if (params.playbackMode && params.playbackFilePath) {
+      if (params['playbackMode'] === true && params['playbackFilePath']) {
         this.isPlaybackMode = true;
         this.isRecording = false;
         this.autoDownload = false;
         this.detectScreenSize();
         this.signalVm.setDisplayCount(this.displayPointCount);
         this.startWaveUiTimer();
-        this.startPlayback(params.playbackFilePath);
+        this.startPlayback(params['playbackFilePath'] as string);
         return;
       }
     }
@@ -452,12 +456,11 @@ export class MonitorViewModel {
   }
 
   openRunDirFolder() {
-    const p = new NavParamsRecord();
-    p.deviceName = this.deviceNameStr;
-    p.baseDir = '';
-    p.deviceKind = this.deviceMode; 
+    const p: Record<string, Object> = {};
+    p['deviceName'] = this.deviceNameStr;
+    p['baseDir'] = '';
+    p['deviceKind'] = this.deviceMode; 
     if (this.uiContext) {
-      // ⭐ 修复：增加对同步调用的异常捕获
       try {
         this.uiContext.getRouter().pushUrl({ url: 'pages/RecordListPage', params: p }, router.RouterMode.Standard).catch((err: Error) => {
           console.error('Router error:', err);
@@ -482,7 +485,6 @@ export class MonitorViewModel {
     for (let b of data) hex += this.toHex(b);
     hex += this.toHex(cs);
 
-    // ⭐ 修复：sendHexString 属于同步方法，不返回 Promise，直接 try...catch 捕获异常
     try {
       this.transport.sendHexString(hex);
     } catch (e) {
@@ -813,33 +815,38 @@ export class MonitorViewModel {
       } else if (cmdPayload.type === 'name') {
         const n = cmdPayload as DeviceNamePayload;
 
-        try {
-          if (this.nameManager && n.deviceIdHex) {
-            this.nameManager.getName(n.deviceIdHex).then((localName: string) => {
-              const finalName = localName ? localName : (n.isConfigured && n.name ? n.name : '[未命名]');
-              if (this.deviceNameStr !== finalName) {
-                this.deviceNameStr = finalName;
-                this.checkAndLog('name', finalName);
-                this.flushPendingLogs();
-              }
-            }).catch(() => {
+        if (this.connectionMode === 'TCP') {
+          this.checkAndLog('name', this.deviceNameStr);
+          this.flushPendingLogs();
+        } else {
+          try {
+            if (this.nameManager && n.deviceIdHex) {
+              this.nameManager.getName(n.deviceIdHex).then((localName: string) => {
+                const finalName = localName ? localName : (n.isConfigured && n.name ? n.name : '[未命名]');
+                if (this.deviceNameStr !== finalName) {
+                  this.deviceNameStr = finalName;
+                  this.checkAndLog('name', finalName);
+                  this.flushPendingLogs();
+                }
+              }).catch(() => {
+                const fallbackName = n.isConfigured && n.name ? n.name : '[未命名]';
+                if (this.deviceNameStr !== fallbackName) {
+                  this.deviceNameStr = fallbackName;
+                  this.checkAndLog('name', fallbackName);
+                  this.flushPendingLogs();
+                }
+              });
+            } else {
               const fallbackName = n.isConfigured && n.name ? n.name : '[未命名]';
               if (this.deviceNameStr !== fallbackName) {
                 this.deviceNameStr = fallbackName;
                 this.checkAndLog('name', fallbackName);
                 this.flushPendingLogs();
               }
-            });
-          } else {
-            const fallbackName = n.isConfigured && n.name ? n.name : '[未命名]';
-            if (this.deviceNameStr !== fallbackName) {
-              this.deviceNameStr = fallbackName;
-              this.checkAndLog('name', fallbackName);
-              this.flushPendingLogs();
             }
+          } catch(e) {
+            console.error('getName error:', e);
           }
-        } catch(e) {
-          console.error('getName error:', e);
         }
 
       } else if (cmdPayload.type === 'channel') {
@@ -995,7 +1002,6 @@ export class MonitorViewModel {
       return decoder.decodeToString(new Uint8Array(buf));
     } catch (e) {
       console.error('readFileContent error:', e);
-      // ⭐ 修复 arkts-limited-throw 警告：统一转换为 Error 对象抛出
       throw new Error(String(e));
     }
   }
@@ -1334,9 +1340,7 @@ export class MonitorViewModel {
   releaseAudioPlayer() {
     if (this.soundPool) {
       try { 
-        this.soundPool.release().catch(() => {
-          // TODO: Implement error handling.
-        }); 
+        this.soundPool.release(); 
       } catch (e) {
         console.error('releaseAudioPlayer error:', e);
       }
@@ -1402,7 +1406,6 @@ export class MonitorViewModel {
     this.lastSetThresholdTime = Date.now();
   }
 
-  // ⭐ 修复警告：移除了未被调用的冗余参数 mode?: number
   updateThresholdFromSlider(v: number) {
     this.sliderValue = v;
     this.lastSetThresholdTime = Date.now();
@@ -1479,12 +1482,12 @@ export class MonitorViewModel {
   onNavClick(idx: number): void {
     this.currentTab = idx;
     try {
-      const navParams = new NavParamsRecord();
-      navParams.deviceName = this.deviceNameStr;
-      navParams.deviceType = this.deviceType;
-      navParams.connectionMode = this.connectionMode;
-      navParams.deviceAddress = this.currentDeviceAddress;
-      navParams.deviceKind = this.deviceMode; 
+      const navParams: Record<string, Object> = {};
+      navParams['deviceName'] = this.deviceNameStr;
+      navParams['deviceType'] = this.deviceType;
+      navParams['connectionMode'] = this.connectionMode;
+      navParams['deviceAddress'] = this.currentDeviceAddress;
+      navParams['deviceKind'] = this.deviceMode; 
 
       if (this.uiContext) {
         const routerInstance = this.uiContext.getRouter();

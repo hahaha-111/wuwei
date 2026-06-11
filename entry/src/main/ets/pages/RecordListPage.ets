@@ -27,6 +27,17 @@ struct RecordListPage {
 
   private uiContext: UIContext | null = null;
 
+  // ⭐ 封装安全的 Toast 方法，避免代码中出现大量的 try-catch 冗余
+  private safeShowToast(msg: string) {
+    if (this.uiContext) {
+      try {
+        this.uiContext.getPromptAction().showToast({ message: msg });
+      } catch (e) {
+        console.error('ShowToast error:', e);
+      }
+    }
+  }
+
   aboutToAppear() {
     this.uiContext = this.getUIContext();
 
@@ -115,7 +126,6 @@ struct RecordListPage {
               try {
                 const stat = fs.statSync(fullPath);
                 if (stat.isDirectory()) {
-                  // 简单处理：尝试删除空文件夹
                   fs.rmdirSync(fullPath);
                 } else {
                   fs.unlinkSync(fullPath);
@@ -126,7 +136,7 @@ struct RecordListPage {
               }
             });
 
-            try { this.getUIContext().getPromptAction().showToast({ message: `已删除 ${deletedCount} 个项目` }); } catch (err) { console.error('toast err', err); }
+            this.safeShowToast(`已删除 ${deletedCount} 个项目`);
             this.toggleEditMode(); // 退出编辑模式
             this.refreshList();
           }
@@ -141,71 +151,74 @@ struct RecordListPage {
 
   // 批量分享
   batchShare() {
-    // 过滤掉文件夹，只分享文件
     const filesToShare = this.selectedFiles.filter(f => f.indexOf('.') !== -1);
 
     if (filesToShare.length === 0) {
-      try { this.getUIContext().getPromptAction().showToast({ message: '请选择文件进行分享' }); } catch (err) { console.error(err); }
-      return;
-    }
-
-    // ⭐ 核心修复：使用扁平化的 Early Return 拦截，完美化解扫描仪因深层嵌套造成的判断失效
-    if (!canIUse('SystemCapability.Share.SystemShare') || !canIUse('SystemCapability.FileManagement.AppFileService.Core')) {
-      try { this.getUIContext().getPromptAction().showToast({ message: '当前系统不支持分享或文件服务功能' }); } catch (err) { console.error(err); }
+      this.safeShowToast('请选择文件进行分享');
       return;
     }
 
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
 
-    try {
-      // 构造第一个分享记录
-      const firstFile = filesToShare[0];
-      const firstPath = `${this.currentPath}/${firstFile}`;
-      const firstUri = fileUri.getUriFromPath(firstPath);
+    // ⭐ 终极方案：绝对禁止使用 &&，使用三层纯粹的单条件嵌套，完全迎合 Linter AST 解析树的口味
+    if (canIUse('SystemCapability.Share.SystemShare')) {
+      if (canIUse('SystemCapability.Collaboration.SystemShare')) {
+        if (canIUse('SystemCapability.FileManagement.AppFileService.Core')) {
+          try {
+            const firstFile = filesToShare[0];
+            const firstPath = `${this.currentPath}/${firstFile}`;
+            const firstUri = fileUri.getUriFromPath(firstPath);
 
-      let type = 'general.file';
-      if (firstFile.endsWith('.png')) type = 'general.image';
-      else if (firstFile.endsWith('.txt') || firstFile.endsWith('.json') || firstFile.endsWith('.csv')) type = 'general.plain-text';
+            let type = 'general.file';
+            if (firstFile.endsWith('.png')) type = 'general.image';
+            else if (firstFile.endsWith('.txt') || firstFile.endsWith('.json') || firstFile.endsWith('.csv')) type = 'general.plain-text';
 
-      const shareData = new systemShare.SharedData({
-        utd: type,
-        uri: firstUri,
-        title: '批量分享',
-        content: `分享 ${filesToShare.length} 个文件`
-      });
+            const shareData = new systemShare.SharedData({
+              utd: type,
+              uri: firstUri,
+              title: '批量分享',
+              content: `分享 ${filesToShare.length} 个文件`
+            });
 
-      // 添加剩余文件
-      for (let i = 1; i < filesToShare.length; i++) {
-        const fileName = filesToShare[i];
-        const fullPath = `${this.currentPath}/${fileName}`;
-        const uri = fileUri.getUriFromPath(fullPath);
+            for (let i = 1; i < filesToShare.length; i++) {
+              const fileName = filesToShare[i];
+              const fullPath = `${this.currentPath}/${fileName}`;
+              const uri = fileUri.getUriFromPath(fullPath);
 
-        let fileType = 'general.file';
-        if (fileName.endsWith('.png')) fileType = 'general.image';
-        else if (fileName.endsWith('.txt') || fileName.endsWith('.json') || fileName.endsWith('.csv')) fileType = 'general.plain-text';
+              let fileType = 'general.file';
+              if (fileName.endsWith('.png')) fileType = 'general.image';
+              else if (fileName.endsWith('.txt') || fileName.endsWith('.json') || fileName.endsWith('.csv')) fileType = 'general.plain-text';
 
-        shareData.addRecord({
-          utd: fileType,
-          uri: uri
-        });
+              shareData.addRecord({
+                utd: fileType,
+                uri: uri
+              });
+            }
+
+            const controller = new systemShare.ShareController(shareData);
+            
+            controller.show(context, {
+              previewMode: systemShare.SharePreviewMode.DEFAULT,
+              selectionMode: systemShare.SelectionMode.BATCH
+            }).catch((e: Error) => {
+              console.error('Batch share show error:', e);
+            });
+          } catch (e) {
+            console.error('Batch share failed:', e);
+            this.safeShowToast('分享调起失败: ' + (e as Error).message);
+          }
+        } else {
+          this.safeShowToast('当前系统不支持文件服务功能');
+        }
+      } else {
+        this.safeShowToast('当前系统不支持分享协作功能');
       }
-
-      const controller = new systemShare.ShareController(shareData);
-      
-      controller.show(context, {
-        previewMode: systemShare.SharePreviewMode.DEFAULT,
-        selectionMode: systemShare.SelectionMode.BATCH
-      }).catch((e: Error) => {
-        console.error('Batch share show error:', e);
-      });
-
-    } catch (e) {
-      console.error('Batch share failed:', JSON.stringify(e));
-      try { this.getUIContext().getPromptAction().showToast({ message: '分享调起失败: ' + (e as Error).message }); } catch (err) { console.error(err); }
+    } else {
+      this.safeShowToast('当前系统不支持基础分享功能');
     }
   }
 
-  // 单个删除（保留原有功能，但在编辑模式下不可用）
+  // 单个删除
   deleteFile(fileName: string) {
     const fullPath = `${this.currentPath}/${fileName}`;
     if (this.uiContext) {
@@ -221,12 +234,12 @@ struct RecordListPage {
           if (resp.index === 1) {
             try {
               fs.unlinkSync(fullPath);
-              try { this.getUIContext().getPromptAction().showToast({ message: '文件已删除' }); } catch (err) { console.error(err); }
+              this.safeShowToast('文件已删除');
               if (this.previewImagePath === fullPath) this.previewImagePath = '';
               if (this.viewingFileName === fileName) this.isViewingText = false;
               this.refreshList();
             } catch (e) {
-              try { this.getUIContext().getPromptAction().showToast({ message: '删除失败: ' + (e as Error).message }); } catch (err) { console.error(err); }
+              this.safeShowToast('删除失败: ' + (e as Error).message);
             }
           }
         }).catch((e: Error) => {
@@ -303,42 +316,46 @@ struct RecordListPage {
   }
 
   shareFile(fileName: string) {
-    // ⭐ 核心修复：同理，采用扁平化前置校验退出，让 Linter 解析器完美闭环
-    if (!canIUse('SystemCapability.Share.SystemShare') || !canIUse('SystemCapability.FileManagement.AppFileService.Core')) {
-      try { this.getUIContext().getPromptAction().showToast({ message: '当前系统不支持分享或文件服务功能' }); } catch (err) { console.error(err); }
-      return;
-    }
-
     const fullPath = `${this.currentPath}/${fileName}`;
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
 
-    try {
-      const uri = fileUri.getUriFromPath(fullPath);
-      let type = 'general.file';
-      if (fileName.endsWith('.png')) type = 'general.image';
-      else if (fileName.endsWith('.json') || fileName.endsWith('.txt') || fileName.endsWith('.csv')) type = 'general.plain-text';
+    // ⭐ 终极方案：同理严格逐层嵌套，避开 AST 解析缺陷
+    if (canIUse('SystemCapability.Share.SystemShare')) {
+      if (canIUse('SystemCapability.Collaboration.SystemShare')) {
+        if (canIUse('SystemCapability.FileManagement.AppFileService.Core')) {
+          try {
+            const uri = fileUri.getUriFromPath(fullPath);
+            let type = 'general.file';
+            if (fileName.endsWith('.png')) type = 'general.image';
+            else if (fileName.endsWith('.txt') || fileName.endsWith('.json') || fileName.endsWith('.csv')) type = 'general.plain-text';
 
-      const shareData = new systemShare.SharedData({
-        utd: type,
-        uri: uri,
-        title: fileName,
-        content: `分享文件: ${fileName}`
-      });
+            const shareData = new systemShare.SharedData({
+              utd: type,
+              uri: uri,
+              title: fileName,
+              content: `分享文件: ${fileName}`
+            });
 
-      const controller = new systemShare.ShareController(shareData);
-      
-      controller.show(context, {
-        previewMode: systemShare.SharePreviewMode.DEFAULT,
-        selectionMode: systemShare.SelectionMode.SINGLE
-      }).catch((e: Error) => {
-        console.error('Share show error:', e);
-      });
-
-    } catch (e) {
-      console.error('Share error', e);
-      try {
-        this.getUIContext().getPromptAction().showToast({ message: '分享失败: ' + (e as Error).message });
-      } catch (ignore) { console.error(ignore); }
+            const controller = new systemShare.ShareController(shareData);
+            
+            controller.show(context, {
+              previewMode: systemShare.SharePreviewMode.DEFAULT,
+              selectionMode: systemShare.SelectionMode.SINGLE
+            }).catch((e: Error) => {
+              console.error('Share show error:', e);
+            });
+          } catch (e) {
+            console.error('Share error', e);
+            this.safeShowToast('分享失败: ' + (e as Error).message);
+          }
+        } else {
+          this.safeShowToast('当前系统不支持文件服务功能');
+        }
+      } else {
+        this.safeShowToast('当前系统不支持分享协作功能');
+      }
+    } else {
+      this.safeShowToast('当前系统不支持基础分享功能');
     }
   }
 

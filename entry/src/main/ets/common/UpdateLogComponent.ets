@@ -10,6 +10,15 @@ export interface UpdateLogItem {
 // Export the data with explicit type
 export const UPDATE_LOGS: UpdateLogItem[] = [
   {
+    version: 'V2.2.5',
+    date: '2026-06-12',
+    content: [
+      '【适配】API 13 严格模式：彻底解决 arkts-no-structural-typing 结构化类型隐式转换报错，全面采用 Record 字典重构跨页面路由传参机制',
+      '【优化】代码质量跃升：深度清理底层逻辑层中未使用的冗余变量、历史遗留包引入，达成严格模式下“零警告、零报错”的完美编译状态',
+      '【修复】类与接口约束：修复了 Interfaces cannot extend classes 的底层语法规范冲突，提升了数据模型在多窗口下的兼容性与稳定性'
+    ]
+  },
+  {
      version: 'V2.2.0',
      date: '2026-06-09',
      content: [
@@ -352,6 +361,7 @@ export struct UpdateLogPopup {
       }
       .layoutWeight(1)
       .width('100%')
+      .height('100%')
       .divider({ strokeWidth: 1, color: '#F5F5F5', startMargin: 0, endMargin: 0 })
 
       Button('关闭')
