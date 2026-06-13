@@ -1,7 +1,7 @@
 import { UIContext, router } from '@kit.ArkUI'; 
 import { detectScreenInfo, ScreenType } from '../common/ScreenTypeHelper';
 import { SignalBoardViewModel } from './SignalBoardViewModel';
-import { ProtocolFrame, DeviceType } from '../common/ProtocolParser';
+import { ProtocolFrame, DeviceType, ProtocolParser } from '../common/ProtocolParser';
 import { TransportManager } from '../common/transport/TransportManager';
 import { ITransport } from '../common/transport/ITransport';
 import { ProtocolDecoder } from '../common/ProtocolDecoder';
