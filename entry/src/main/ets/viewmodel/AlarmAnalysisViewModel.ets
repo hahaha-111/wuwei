@@ -299,7 +299,7 @@ export class AlarmAnalysisViewModel {
       tcpClient.setOnMessage((event: TcpMessageEvent): void => {
         const data = new Uint8Array(event.message);
         try {
-          const decoder = new util.TextDecoder('gbk', { ignoreBOM: true });
+        const decoder = util.TextDecoder.create('gbk', { ignoreBOM: true });
           this.receiveBuffer += decoder.decodeToString(data);
         } catch (e) {
           console.error('GBK解码异常', e);

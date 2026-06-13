@@ -31,29 +31,7 @@ import { ImageGenerator, SnapshotInfo } from '../common/utils/ImageGenerator';
 export type DeviceMode = 'RX' | 'TX' | 'FIBER' | 'UNKNOWN';
 export type FiberChannelMode = 'ALL' | 'CH1' | 'CH2' | 'CH3' | 'CH4';
 
-// ⭐ 修复编译报错：恢复路由对象，且改为 class 防止被严格模式识别为结构化隐式转换
-export class MonitorPageParams {
-  screenType?: ScreenType;
-  deviceType?: DeviceType;
-  deviceKind?: DeviceMode;
-  connectionMode?: 'BLE' | 'TCP';
-  deviceName?: string;
-  deviceAddress?: number;
-  playbackMode?: boolean;
-  playbackFilePath?: string;
-  port?: string;
-  fromPage?: string;
-}
-
-export class NavParamsRecord {
-  deviceName?: string;
-  deviceType?: number;
-  screenType?: string;
-  connectionMode?: string;
-  deviceAddress?: number;
-  baseDir?: string;
-  deviceKind?: DeviceMode; 
-}
+// ⭐ 已删除无用的 MonitorPageParams 和 NavParamsRecord 死代码
 
 export interface ParamItem {
   label: string;
@@ -73,7 +51,9 @@ export interface DeviceLogState {
   sensitivity?: number;
   calibrate?: number;
   name?: string;
-  lastSignal?: number; 
+  hasLoggedName?: boolean;
+  hasLoggedChannel?: boolean;
+  hasLoggedThreshold?: boolean;
 }
 
 export interface RecordFrame {
@@ -177,16 +157,15 @@ export class MonitorViewModel {
   connectionMode: 'BLE' | 'TCP' = 'BLE';
   isConnected: boolean = false;
   private transport: ITransport;
-  // ⭐ P1: 统一使用全局 ProtocolParser，自定义校验在全业务层处理
   private protocolParser: ProtocolParser = new ProtocolParser();
 
   public currentDeviceAddress: number = 0x01;
   private lastProbeTime: number = 0;
   private hasSyncedTime: boolean = false;
-  // ⭐ P3: 记录上次下发校时指令的物理时间，冷却期内不重复同步
   private lastTimeSyncTick: number = 0;
 
-  waveIntervalMs: number = 40;
+  // ⭐ 优化：发包间隔调整为 80ms，降低 BLE 压力
+  waveIntervalMs: number = 50;
   displayPointCount: number = 60;
   private waveTimer: number = -1;
   private timeSyncTimer: number = -1;
@@ -262,32 +241,25 @@ export class MonitorViewModel {
 
     if (type === 'name') {
       const valStr = String(value);
-      if (state.name !== valStr) {
+      if (!state.hasLoggedName && valStr !== '[空]' && valStr !== '未配置' && valStr !== '[未命名]' && valStr !== '未命名设备' && valStr !== '未知设备') {
+        state.hasLoggedName = true;
         state.name = valStr;
-        if (valStr !== '[空]' && valStr !== '未配置' && valStr !== '[未命名]' && valStr !== '未命名设备') {
-          this.addLog(LogCategory.QUERY, '设备信息', `设备名称: ${valStr}`, deviceId);
-        }
+        this.addLog(LogCategory.QUERY, '读取设备信息', `设备名称: ${valStr}`, deviceId);
       }
     } else if (type === 'channel') {
       const valNum = Number(value);
-      if (state.channel !== valNum) {
+      if (!state.hasLoggedChannel) {
+        state.hasLoggedChannel = true;
         state.channel = valNum;
-        this.addLog(LogCategory.QUERY, '参数读取', `通道变动: ${valNum}`, deviceId);
+        this.addLog(LogCategory.QUERY, '读取设备参数', `当前通道: ${valNum}`, deviceId);
       }
     } else if (type === 'threshold') {
       const valNum = Number(value);
-      if (state.threshold !== valNum) {
+      if (!state.hasLoggedThreshold) {
+        state.hasLoggedThreshold = true;
         state.threshold = valNum;
-        this.addLog(LogCategory.QUERY, '参数读取', `阈值/灵敏度变动: ${valNum}`, deviceId);
+        this.addLog(LogCategory.QUERY, '读取设备参数', `当前阈值/灵敏度: ${valNum}`, deviceId);
       }
-    }
-  }
-
-  private checkAndLogSignal(signal: number) {
-    const state = this.getLogState();
-    if (state.lastSignal === undefined || Math.abs(state.lastSignal - signal) > 4) {
-      state.lastSignal = signal;
-      this.addLog(LogCategory.QUERY, '信号波动', `当前信号值大幅波动: ${signal}`, this.transport.getId() || '-');
     }
   }
 
@@ -379,7 +351,6 @@ export class MonitorViewModel {
     const isConn = this.transport.isConnected();
     this.setConnected(isConn);
 
-    // ⭐ 光纤设备初次加载：主动调用 readDeviceParams 唤醒设备
     if (this.deviceMode === 'FIBER') {
       this.readDeviceParams();
     }
@@ -568,10 +539,10 @@ export class MonitorViewModel {
       const isConn = (state === 'CONNECTED');
       this.setConnected(isConn);
 
-    // ⭐ 光纤设备初次加载：主动调用 readDeviceParams 唤醒设备
-    if (this.deviceMode === 'FIBER') {
-      this.readDeviceParams();
-    }
+      if (this.deviceMode === 'FIBER') {
+        this.readDeviceParams();
+      }
+      
       if (state === 'DISCONNECTED') {
         this.addLog(LogCategory.CONNECTION, '设备断开', '检测到连接中断', deviceId || '-');
         this.showToastMsg('设备已断开');
@@ -601,7 +572,6 @@ export class MonitorViewModel {
       console.info('MonitorVM', `◀ 收到帧: cmd=0x${cmdByte.toString(16).toUpperCase()} dataLen=${frame.dataLength}`);
     }
 
-    // ⭐ P1: 使用统一的全局 ProtocolParser，校验宽容规则放在业务层
     const isFiber = (frame.deviceType === 0x66);
     const isVoltage = (cmdByte === 0x97);
     if (!frame.checksumOk && !isFiber && !isVoltage) {
@@ -690,7 +660,6 @@ export class MonitorViewModel {
         }
 
         this.signalVm.pushStatus(s);
-        this.checkAndLogSignal(s.signal);
 
         this.checkAndPlaySound();
         this.handleAutoDownload(s.alarm);
@@ -763,7 +732,6 @@ export class MonitorViewModel {
         }
 
         this.signalVm.pushFiber(f);
-        this.checkAndLogSignal(f.fiber1Signal);
 
       } else if (cmdPayload.type === 'tempHumidity') {
         const t = cmdPayload as TempHumidityPayload;
@@ -848,7 +816,6 @@ export class MonitorViewModel {
           const deviceTime = new Date(t.year, t.month - 1, t.day, t.hour, t.minute, t.second).getTime();
           const localTime = Date.now();
           if (Math.abs(deviceTime - localTime) > 2000) {
-            // ⭐ P3: 冷却重试机制 — 从未同步过，或距离上次同步已过10分钟(600s)则允许重试
             if (!this.hasSyncedTime || (localTime - this.lastTimeSyncTick > 600_000)) {
               this.hasSyncedTime = true;
               this.lastTimeSyncTick = localTime;
@@ -878,7 +845,6 @@ export class MonitorViewModel {
     if (isAlarm && !this.isAlarmingLocked) {
       this.isAlarmingLocked = true;
 
-      // ⭐ P0: 设置新定时器前，先清掉旧的防止堆积
       if (this.alarmDebounceTimer !== -1) {
         clearTimeout(this.alarmDebounceTimer);
       }
@@ -890,7 +856,6 @@ export class MonitorViewModel {
     } else if (!isAlarm) {
       this.isAlarmingLocked = false;
 
-      // ⭐ P0: 报警恢复时，截断未执行的截图任务
       if (this.alarmDebounceTimer !== -1) {
         clearTimeout(this.alarmDebounceTimer);
         this.alarmDebounceTimer = -1;
@@ -1117,14 +1082,12 @@ export class MonitorViewModel {
       this.startWaveCommandTimer();
       this.startWaveUiTimer();
     } else {
-      // ⭐ P0: 断开时彻底停掉所有定时器，防止后台空跑
       this.stopWaveCommandTimer();
       this.stopTimeSyncLoop();
       this.stopWaveUiTimer();
       this.clearLogState();
       this.pendingLogs = [];
 
-      // 重置波形数据，避免 UI 停留在最后一帧乱码
       this.signalVm.clearBuffer();
       this.avgValue = 0;
       this.variance = 0;
@@ -1332,7 +1295,7 @@ export class MonitorViewModel {
   releaseAudioPlayer() {
     if (this.soundPool) {
       try { 
-        this.soundPool.release(); 
+        this.soundPool.release().catch(() => {});
       } catch (e) {
         console.error('releaseAudioPlayer error:', e);
       }

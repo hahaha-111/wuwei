@@ -17,12 +17,12 @@ export class FileUtil {
     // 结构: filesDir/无畏/设备名/2025-12-12/报警记录
     const path = `${context.filesDir}/${FileUtil.ROOT_NAME}/${safeDeviceName}/${dateStr}/${subDir}`;
 
-    if (!fs.accessSync(path)) {
-      try {
+    try {
+      if (!fs.accessSync(path)) {
         fs.mkdirSync(path, true);
-      } catch (e) {
-        console.error(`mkdir failed: ${path}, ${e}`);
       }
+    } catch (e) {
+      console.error(`access/mkdir failed: ${path}, ${e}`);
     }
     return path;
   }

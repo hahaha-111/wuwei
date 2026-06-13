@@ -1,7 +1,7 @@
 // pages/SettingPage.ets
-import { router } from '@kit.ArkUI'; // ⭐ 修复：统一使用 ArkUI 下的安全路由
+import { router } from '@kit.ArkUI'; 
 import { common } from '@kit.AbilityKit';
-import { SettingViewModel, SettingPageParams } from '../viewmodel/SettingViewModel';
+import { SettingViewModel } from '../viewmodel/SettingViewModel'; // ⭐ 移除了 SettingPageParams
 import { detectScreenInfo } from '../common/ScreenTypeHelper';
 import { DeviceType } from '../common/ProtocolParser';
 
@@ -54,9 +54,9 @@ struct SettingPage {
   private currentTab: string = 'setting';
 
   aboutToAppear() {
-    // ⭐ 修复警告：使用 API 13 专用的 getHostContext 和 UIContext 路由参数获取方式
     const ctx = this.getUIContext().getHostContext() as common.UIAbilityContext;
-    const params = this.getUIContext().getRouter().getParams() as SettingPageParams;
+    // ⭐ 使用 Record 字典接收路由参数
+    const params = this.getUIContext().getRouter().getParams() as Record<string, Object>;
     this.vm.init(params, ctx);
     this.adaptScreen();
   }
@@ -89,7 +89,6 @@ struct SettingPage {
       return;
     }
     if (tab === 'calibrate' && this.vm.deviceType !== DeviceType.Microwave) {
-      // ⭐ 修复警告：替换废弃的全局 promptAction
       try { this.getUIContext().getPromptAction().showToast({ message: '当前设备不支持校准功能' }); } catch (err) {}
       return;
     }
@@ -98,16 +97,15 @@ struct SettingPage {
       ? this.vm.deviceName
       : this.vm.originalDeviceName;
 
-    const navParams: SettingPageParams = {
-      deviceName: finalName,
-      deviceType: this.vm.deviceType,
-      connectionMode: this.vm.connectionMode,
-      deviceAddress: this.vm.currentAddress
-    };
+    // ⭐ 使用 Record 字典构建路由参数
+    const navParams: Record<string, Object> = {};
+    navParams['deviceName'] = finalName;
+    navParams['deviceType'] = this.vm.deviceType;
+    navParams['connectionMode'] = this.vm.connectionMode;
+    navParams['deviceAddress'] = this.vm.currentAddress;
 
     const uiRouter = this.getUIContext().getRouter();
 
-    // ⭐ 修复警告：使用 UIContext 的 router 方法，并明确指定 Standard 模式
     if (tab === 'home') {
       uiRouter.replaceUrl({ url: 'pages/MonitorPage', params: navParams }, router.RouterMode.Standard).catch(() => {});
     }
@@ -332,7 +330,6 @@ struct SettingPage {
 
   @Builder rightColumn() {
     Column() {
-      // ⭐ UI层修正：只有微波设备才显示这些它专属的选项
       if (this.vm.deviceType === DeviceType.Microwave) {
         Column() {
           Row() {
@@ -535,7 +532,6 @@ struct SettingPage {
         .layoutWeight(1)
         .justifyContent(FlexAlign.Center)
       } else {
-        // 光纤模式由于隐藏了微波专属功能，通过空白填充维持左右同等行距高度比例
         Column().layoutWeight(1)
         Column().layoutWeight(1)
       }
@@ -600,13 +596,13 @@ struct SettingPage {
             .fontSize(this.isCompact ? 11 : 13)
             .backgroundColor('#FF9800')
             .onClick(() => {
-              const navParams: SettingPageParams = {
-                deviceName: this.vm.deviceName,
-                deviceType: this.vm.deviceType,
-                connectionMode: this.vm.connectionMode,
-                deviceAddress: this.vm.currentAddress
-              };
-              // ⭐ 修复警告：使用 UIContext 触发的 pushUrl，并加上 Standard 模式
+              // ⭐ 使用 Record 字典构建路由参数
+              const navParams: Record<string, Object> = {};
+              navParams['deviceName'] = this.vm.deviceName;
+              navParams['deviceType'] = this.vm.deviceType;
+              navParams['connectionMode'] = this.vm.connectionMode;
+              navParams['deviceAddress'] = this.vm.currentAddress;
+              
               this.getUIContext().getRouter().pushUrl({ url: 'pages/FilterSettingPage', params: navParams }, router.RouterMode.Standard).catch(() => {});
             })
         }

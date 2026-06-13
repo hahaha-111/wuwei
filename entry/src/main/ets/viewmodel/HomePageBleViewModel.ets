@@ -9,7 +9,7 @@ import { TcpTransport } from '../common/transport/TcpTransport';
 import { util } from '@kit.ArkTS';
 
 import pasteboard from '@ohos.pasteboard';
-import { UIContext, router } from '@kit.ArkUI'; // ⭐ 修复：统一引入 UIContext 与 router，去除 promptAction
+import { UIContext, router } from '@kit.ArkUI'; 
 import window from '@ohos.window';
 import dataPreferences from '@ohos.data.preferences';
 
@@ -68,7 +68,6 @@ export class HomePageBleViewModel {
   selectedDeviceName: string = '';
   // ⭐ 光纤：记录探测到的设备地址
   detectedFiberAddress: number = 0x01;
-
 
   versionName: string = '';
 
@@ -454,17 +453,18 @@ export class HomePageBleViewModel {
     else if (kind === 'FIBER') { deviceType = DeviceType.Fiber; deviceKind = 'FIBER'; }
     
     if (this.uiContext) {
+      // ⭐ 修复：使用 Record 字典传递参数，并补上缺失的逗号，完美避开所有编译报错！
+      const navParams: Record<string, Object> = {};
+      navParams['screenType'] = this.screenType;
+      if (deviceType !== undefined) navParams['deviceType'] = deviceType;
+      if (deviceKind !== undefined) navParams['deviceKind'] = deviceKind;
+      navParams['connectionMode'] = (this.staMode || this.tcpMode) ? 'TCP' : 'BLE';
+      navParams['deviceName'] = this.selectedDeviceName;
+      navParams['deviceAddress'] = this.detectedFiberAddress;
+
       this.uiContext.getRouter().pushUrl({
         url: 'pages/MonitorPage',
-        params: {
-          screenType: this.screenType,
-          deviceType: deviceType,
-          deviceKind: deviceKind,
-          connectionMode: (this.staMode || this.tcpMode) ? 'TCP' : 'BLE',
-          // ⭐ 传递点击列表时选择的名称
-          deviceName: this.selectedDeviceName,
-          deviceAddress: this.detectedFiberAddress,
-        }
+        params: navParams
       }, router.RouterMode.Standard).catch(() => {});
     }
   }
@@ -491,7 +491,6 @@ export class HomePageBleViewModel {
     this.closeTcpListClient();
     if (!await this.ensureAuthorized(false)) return;
 
-    // ⭐ 在点击设备时，记录用户点击的列表名称
     this.selectedDeviceName = item.name;
 
     this.updateDeviceStatus(item.id, this.getString($r('app.string.device_status_connecting'), '正在连接'));
@@ -888,7 +887,6 @@ export class HomePageBleViewModel {
     if (!this.machineCode) return;
     try {
       const data = pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, this.machineCode);
-    
       await pasteboard.getSystemPasteboard().setData(data);
       this.showToastMsg(this.getString($r('app.string.toast_copy_machine_code_success'), '已复制')); 
     } catch (e) {
@@ -898,7 +896,6 @@ export class HomePageBleViewModel {
 
   async pasteRegisterCode(): Promise<void> {
     try {
-    
       const data = await pasteboard.getSystemPasteboard().getData();
       if (data) {
         const text = data.getPrimaryText();
