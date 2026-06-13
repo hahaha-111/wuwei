@@ -19,36 +19,31 @@ export enum OtaState {
   ERROR
 }
 
-// 回调接口定义，用于解耦 UI 和发送逻辑
 export interface StcOtaCallbacks {
-  // 发送数据的底层接口 (BLE/TCP)
   onSendData: (data: Uint8Array) => Promise<void>;
-  // UI 消息通知
   onMessage: (msg: string) => void;
-  // 进度更新 (0-100)
   onProgress: (progress: number) => void;
-  // 成功回调
   onSuccess: (costTime: string) => void;
-  // 失败回调
   onError: (reason: string) => void;
 }
 
 export class StcOtaController {
-  // 配置参数
-  public packetSize: number = 64;
+  // --- 🟡 P1: 配置项 ---
+  public packetSize: number = 64; // 注意: 如果是 BLE 且 MTU 未扩大，建议设为 16 或 20
   public delayMs: number = 20;
   public maxRetries: number = 5;
-  public baseAddress: number = 0x1000;
+  // 支持动态配置 Bootloader 大小，AI8051U 32位模式(C251) 必须配置为 0x2000 (8KB)
+  public baseAddress: number = 0x2000; 
 
-  // 运行状态
   private state: OtaState = OtaState.IDLE;
   private fileBuffer: Uint8Array = new Uint8Array(0);
   private currentOffset: number = 0;
   private startTime: number = 0;
   private retryCount: number = 0;
   private timeoutTimer: number = -1;
-  // ⭐ P2: 记录最后一次发包的物理时间戳，用于 RTT 时间差拦截幽灵 ACK
-  private lastSendTime: number = 0;
+
+  // --- 🔴 P0: 接收环形缓冲区，解决半包/粘包 ---
+  private rxBuffer: number[] = [];
 
   private callbacks: StcOtaCallbacks;
 
@@ -56,9 +51,7 @@ export class StcOtaController {
     this.callbacks = callbacks;
   }
 
-  public getState(): OtaState {
-    return this.state;
-  }
+  public getState(): OtaState { return this.state; }
 
   public isRunning(): boolean {
     return this.state !== OtaState.IDLE && this.state !== OtaState.COMPLETE && this.state !== OtaState.ERROR;
@@ -67,10 +60,11 @@ export class StcOtaController {
   public stop(): void {
     this.clearTimeout();
     this.state = OtaState.IDLE;
+    this.rxBuffer = [];
   }
 
-  // 启动 OTA 流程
   public async start(fileUri: string): Promise<void> {
+    this.stop(); // 重置状态和缓冲区
     this.state = OtaState.IDLE;
     this.startTime = Date.now();
     this.retryCount = 0;
@@ -78,32 +72,22 @@ export class StcOtaController {
     this.callbacks.onMessage('正在读取固件文件...');
 
     try {
-      // 1. 读取文件
       const file = fs.openSync(fileUri, fs.OpenMode.READ_ONLY);
       const stat = fs.statSync(file.fd);
-      const size = stat.size;
-      const buf = new ArrayBuffer(size);
+      const buf = new ArrayBuffer(stat.size);
       fs.readSync(file.fd, buf);
       fs.closeSync(file);
 
       let finalBuffer = new Uint8Array(buf);
 
-      // 2. 格式检查 (HEX 文本检测)
+      // 格式检查
       if (finalBuffer.length > 0 && finalBuffer[0] === 0x3A) {
         throw new Error('检测到 HEX 文本格式！请使用 .bin 二进制文件。');
       }
 
-      // 3. 头部检查 (调试用)
-      if (finalBuffer.length > 16) {
-        const headBytes = finalBuffer.slice(0, 16);
-        const headStr = Array.from(headBytes).map((b: number): string => b.toString(16).padStart(2, '0')).join(' ');
-        console.warn('OTA_DEBUG: BIN Head: ' + headStr);
-      }
-
-      // 4. 自动裁剪 (Keil 填充处理)
+      // 自动裁剪 Bootloader 填充 (交由外部或UI判断更佳，这里保留基本探测)
       if (finalBuffer.length > this.baseAddress) {
         let isPadding = true;
-        // 采样检测前 128 字节
         for (let i = 0; i < 128; i++) {
           if (finalBuffer[i] !== 0xFF && finalBuffer[i] !== 0x00) {
             isPadding = false;
@@ -111,7 +95,7 @@ export class StcOtaController {
           }
         }
         if (isPadding) {
-          this.callbacks.onMessage('自动裁剪 BIN 文件头部填充(4KB)...');
+          this.callbacks.onMessage(`自动裁剪 BIN 文件头部填充(0x${this.baseAddress.toString(16)})...`);
           finalBuffer = finalBuffer.slice(this.baseAddress);
         }
       }
@@ -119,70 +103,87 @@ export class StcOtaController {
       this.fileBuffer = finalBuffer;
       this.currentOffset = 0;
 
-      this.callbacks.onMessage(`文件准备就绪 (${this.fileBuffer.byteLength} bytes)，发送握手指令...`);
+      this.callbacks.onMessage(`文件就绪 (${this.fileBuffer.byteLength} 字节)，发送握手...`);
 
-      // 5. 发送握手
-      await this.sendRawData(new Uint8Array([STC_CMD_CONNECT]));
-
+      // 握手包 (去除 0x00 占位符，匹配 C251 Bootloader)
+      await this.sendRawData(new Uint8Array([STC_HEAD, STC_CMD_CONNECT, STC_TAIL]));
       this.state = OtaState.WAIT_CONNECT_ACK;
       this.startTimeout(2000);
 
     } catch (e) {
-      let errMsg = '未知错误';
-      if (e instanceof Error) {
-        errMsg = e.message;
-      } else {
-        errMsg = JSON.stringify(e);
-      }
+      let errMsg = e instanceof Error ? e.message : JSON.stringify(e);
       this.handleError('启动失败: ' + errMsg);
     }
   }
 
-  // 处理接收到的数据 (在 ViewModel 的 onDataReceived 中调用)
+  // --- 🔴 P0: 使用环形缓冲区解析数据，避免丢帧 ---
   public processRxData(data: Uint8Array): void {
     if (!this.isRunning()) return;
 
-    // 协议格式: HEAD(0x55) CMD STATUS TAIL(0xAA)
-    if (data.length < 4) return;
+    // 1. 将新数据压入环形缓冲区
+    for (let i = 0; i < data.length; i++) {
+      this.rxBuffer.push(data[i]);
+    }
 
-    // 寻找帧头
-    let idx = -1;
-    for (let i = 0; i < data.length - 3; i++) {
-      if (data[i] === STC_HEAD && data[i + 3] === STC_TAIL) {
-        idx = i;
-        break;
+    // 2. 循环解析完整帧
+    while (this.rxBuffer.length >= 4) {
+      // 寻找帧头 0x55
+      const headIdx = this.rxBuffer.indexOf(STC_HEAD);
+      if (headIdx === -1) {
+        this.rxBuffer = []; // 全是垃圾数据，清空
+        return;
       }
+      if (headIdx > 0) {
+        this.rxBuffer.splice(0, headIdx); // 丢弃帧头前面的脏数据
+      }
+
+      if (this.rxBuffer.length < 4) return; // 剩余长度不足以判断，等待更多数据
+
+      const cmd = this.rxBuffer[1];
+      
+      // 🔴 P0: 根据命令类型确定预期帧长
+      // CONNECT/ERASE/RUN 的 ACK: HEAD(1) + CMD(1) + STATUS(1) + TAIL(1) = 4 Bytes
+      // WRITE_DATA 的 ACK:      HEAD(1) + CMD(1) + ADDR_H(1) + ADDR_L(1) + STATUS(1) + TAIL(1) = 6 Bytes
+      let expectedLen = 4; 
+      if (cmd === STC_CMD_WRITE_DATA) {
+        expectedLen = 6;
+      }
+
+      if (this.rxBuffer.length < expectedLen) return; // 数据不够完整一帧，等待
+
+      // 校验帧尾
+      if (this.rxBuffer[expectedLen - 1] !== STC_TAIL) {
+        // 帧尾不对，说明这是个假包头，丢掉这个假包头继续找
+        this.rxBuffer.shift(); 
+        continue;
+      }
+
+      // 提取出一帧完整数据
+      const frame = this.rxBuffer.splice(0, expectedLen);
+      this.handleValidFrame(frame, cmd);
     }
+  }
 
-    if (idx === -1) return; // 无效帧
-
-    const cmd = data[idx + 1];
-    const status = data[idx + 2];
-
-    if (status !== STC_STATUS_OK) {
-      this.callbacks.onMessage(`指令 0x${cmd.toString(16)} 返回错误码: ${status}`);
-      return;
-    }
-
-    // ⭐ P2: 状态机流转（不在此统一 clearTimeout，由各 case 自行管理
-    //          防止幽灵 ACK 进入 SENDING 后回车杀掉了等待中的超时定时器）
+  // 处理提取出的有效协议帧
+  private handleValidFrame(frame: number[], cmd: number): void {
     switch (this.state) {
       case OtaState.WAIT_CONNECT_ACK:
-        if (cmd === STC_CMD_CONNECT) {
+        if (cmd === STC_CMD_CONNECT && frame[2] === STC_STATUS_OK) {
           this.clearTimeout();
           this.retryCount = 0;
-          this.callbacks.onMessage('握手成功，正在擦除 App 区 (请稍候)...');
-          this.sendRawData(new Uint8Array([STC_CMD_ERASE_APP]));
+          this.callbacks.onMessage('握手成功，正在擦除 APP 区 (请稍候)...');
+          // 发送擦除指令 (去除 0x00 占位符)
+          this.sendRawData(new Uint8Array([STC_HEAD, STC_CMD_ERASE_APP, STC_TAIL]));
           this.state = OtaState.WAIT_ERASE_ACK;
-          this.startTimeout(5000); // 擦除需要时间
+          this.startTimeout(8000); // 擦除 Flash 需要较长时间，放宽超时
         }
         break;
 
       case OtaState.WAIT_ERASE_ACK:
-        if (cmd === STC_CMD_ERASE_APP) {
+        if (cmd === STC_CMD_ERASE_APP && frame[2] === STC_STATUS_OK) {
           this.clearTimeout();
           this.retryCount = 0;
-          this.callbacks.onMessage('擦除完成，开始写入...');
+          this.callbacks.onMessage('擦除完成，开始写入数据...');
           this.state = OtaState.SENDING;
           this.sendNextPacket();
         }
@@ -190,25 +191,35 @@ export class StcOtaController {
 
       case OtaState.SENDING:
         if (cmd === STC_CMD_WRITE_DATA) {
-          // ⭐ P2: STC 协议 ACK 只有 4 字节(HEAD+CMD+STATUS+TAIL)，不带 offset
-          //       用 RTT 时间差启发式拦截超时后的幽灵 ACK
-          const rtt = Date.now() - this.lastSendTime;
-          if (rtt < 60) {
-            console.warn(`OTA_DEBUG: 丢弃幽灵 ACK (RTT=${rtt}ms)，等待超时重试`);
-            // 不杀定时器，让现有 timeout 触发重试
+          // 🔴 P0: 彻底解决幽灵 ACK (使用 Offset 比对而非 RTT)
+          // ACK格式: [0x55, 0xA2, ADDR_H, ADDR_L, STATUS, 0xAA]
+          const ackAddrH = frame[2];
+          const ackAddrL = frame[3];
+          const status = frame[4];
+          
+          const ackAddr = (ackAddrH << 8) | ackAddrL;
+          const currentTargetAddr = this.baseAddress + this.currentOffset;
+
+          if (ackAddr !== currentTargetAddr) {
+            console.warn(`OTA: 拦截到过期或错位 ACK (Expected: 0x${currentTargetAddr.toString(16)}, Got: 0x${ackAddr.toString(16)})`);
+            return; // 忽略此包，不清除定时器，等待真实 ACK 或超时
+          }
+
+          if (status !== STC_STATUS_OK) {
+            this.handleError(`单片机写入失败，状态码: ${status}`);
             return;
           }
 
-          this.clearTimeout();
+          // 是我们期待的当前包的 ACK
+          this.clearTimeout(); // 先清除定时器，解决时序冲突
           this.retryCount = 0;
 
           const remaining = this.fileBuffer.byteLength - this.currentOffset;
           const justSentLen = (remaining > this.packetSize) ? this.packetSize : remaining;
-          this.currentOffset += justSentLen;
+          this.currentOffset += justSentLen; // 更新偏移量
 
-          // 延时发送下一包
           if (this.delayMs > 0) {
-            setTimeout((): void => { this.sendNextPacket(); }, this.delayMs);
+            setTimeout(() => this.sendNextPacket(), this.delayMs);
           } else {
             this.sendNextPacket();
           }
@@ -216,7 +227,7 @@ export class StcOtaController {
         break;
 
       case OtaState.WAIT_RUN_ACK:
-        if (cmd === STC_CMD_RUN_APP) {
+        if (cmd === STC_CMD_RUN_APP && frame[2] === STC_STATUS_OK) {
           this.clearTimeout();
           this.retryCount = 0;
           this.handleSuccess();
@@ -226,15 +237,14 @@ export class StcOtaController {
   }
 
   private async sendNextPacket(): Promise<void> {
-    // 检查是否结束
     if (this.currentOffset >= this.fileBuffer.byteLength) {
-      this.callbacks.onMessage('写入完成，请求运行 App...');
-      await this.sendRawData(new Uint8Array([STC_CMD_RUN_APP]));
+      this.callbacks.onMessage('写入完成，请求运行 APP...');
+      // 请求运行 APP (去除 0x00 占位符)
+      await this.sendRawData(new Uint8Array([STC_HEAD, STC_CMD_RUN_APP, STC_TAIL]));
       this.state = OtaState.WAIT_RUN_ACK;
       this.startTimeout(2000);
       return;
     }
-
     this.resendCurrentPacket();
   }
 
@@ -242,50 +252,49 @@ export class StcOtaController {
     const remaining = this.fileBuffer.byteLength - this.currentOffset;
     const len = (remaining > this.packetSize) ? this.packetSize : remaining;
 
-    // 包结构: CMD + ADDR_H + ADDR_L + LEN + DATA... + CS
-    const packet = new Uint8Array(5 + len);
+    // 🔴 P0: 重构发送报文，加上严格的 HEAD 和 TAIL
+    // 包结构: HEAD(1) + CMD(1) + ADDR_H(1) + ADDR_L(1) + LEN(1) + DATA(len) + CS(1) + TAIL(1) = 7 + len
+    const packet = new Uint8Array(7 + len);
     const targetAddr = this.baseAddress + this.currentOffset;
     const addrH = (targetAddr >> 8) & 0xFF;
     const addrL = targetAddr & 0xFF;
 
-    packet[0] = STC_CMD_WRITE_DATA;
-    packet[1] = addrH;
-    packet[2] = addrL;
-    packet[3] = len;
+    packet[0] = STC_HEAD;
+    packet[1] = STC_CMD_WRITE_DATA;
+    packet[2] = addrH;
+    packet[3] = addrL;
+    packet[4] = len;
 
     let checksum = STC_CMD_WRITE_DATA + addrH + addrL + len;
     for (let i = 0; i < len; i++) {
       const byte = this.fileBuffer[this.currentOffset + i];
-      packet[4 + i] = byte;
+      packet[5 + i] = byte;
       checksum += byte;
     }
-    packet[4 + len] = checksum & 0xFF;
+    
+    packet[5 + len] = checksum & 0xFF;
+    packet[6 + len] = STC_TAIL;
 
     await this.sendRawData(packet);
 
-    // 更新进度
     const progress = Math.floor((this.currentOffset / this.fileBuffer.byteLength) * 100);
     this.callbacks.onProgress(progress);
     this.callbacks.onMessage(`写入: ${progress}% (Addr: 0x${targetAddr.toString(16)})`);
 
-    this.startTimeout(3000);
+    this.startTimeout(3000); // 发送完毕后启动定时器
   }
 
   private async sendRawData(data: Uint8Array): Promise<void> {
     try {
-      this.lastSendTime = Date.now(); // ⭐ P2: 记录发送时间戳
       await this.callbacks.onSendData(data);
     } catch (e) {
       console.error('OTA Send Error', JSON.stringify(e));
-      // 发送异常不中断，等待超时重试
     }
   }
 
   private startTimeout(ms: number): void {
     this.clearTimeout();
-    this.timeoutTimer = setTimeout((): void => {
-      this.handleTimeout();
-    }, ms);
+    this.timeoutTimer = setTimeout(() => this.handleTimeout(), ms);
   }
 
   private clearTimeout(): void {
@@ -297,22 +306,26 @@ export class StcOtaController {
 
   private handleTimeout(): void {
     this.retryCount++;
-    const reason = '等待响应超时';
+    const reason = '无响应或丢包';
 
     if (this.retryCount > this.maxRetries) {
-      this.handleError(`${reason} (超过最大重试次数)`);
+      this.handleError(`${reason} (超时超过 ${this.maxRetries} 次)`);
       return;
     }
 
-    this.callbacks.onMessage(`OTA 重试 ${this.retryCount}/${this.maxRetries}: ${reason}`);
+    this.callbacks.onMessage(`OTA 重试 ${this.retryCount}/${this.maxRetries}...`);
 
+    // 超时重传当前状态的包
     if (this.state === OtaState.SENDING) {
       this.resendCurrentPacket();
     } else if (this.state === OtaState.WAIT_CONNECT_ACK) {
-      this.sendRawData(new Uint8Array([STC_CMD_CONNECT]));
+      this.sendRawData(new Uint8Array([STC_HEAD, STC_CMD_CONNECT, STC_TAIL]));
       this.startTimeout(2000);
     } else if (this.state === OtaState.WAIT_ERASE_ACK) {
-      this.handleError('擦除指令无响应，设备可能异常');
+      this.handleError('擦除无响应，设备可能已跑飞断联');
+    } else if (this.state === OtaState.WAIT_RUN_ACK) {
+      this.sendRawData(new Uint8Array([STC_HEAD, STC_CMD_RUN_APP, STC_TAIL]));
+      this.startTimeout(2000);
     }
   }
 

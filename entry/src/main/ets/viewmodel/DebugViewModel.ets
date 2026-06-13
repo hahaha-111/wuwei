@@ -5,7 +5,7 @@ import dataPreferences from '@ohos.data.preferences';
 import { BusinessError } from '@ohos.base';
 import { picker } from '@kit.CoreFileKit';
 import { pasteboard } from '@kit.BasicServicesKit';
-import { UIContext } from '@kit.ArkUI'; // ⭐ 替换过时的 promptAction
+import { UIContext } from '@kit.ArkUI';
 import AdapterManager from '../bluetooth/AdapterManager';
 import bleScanManager, { BleDevice } from '../bluetooth/BleSearch';
 import gattClientManager from '../bluetooth/GattClientManager';
@@ -13,12 +13,17 @@ import { PermissionUtil } from '../utils/PermissionUtil';
 import { BLE_PERMISSIONS } from '../utils/PermissionsConfig';
 import { ProtocolFrame, ProtocolParser, DeviceType } from '../common/ProtocolParser';
 import { ProtocolDecoder } from '../common/ProtocolDecoder';
+import { AppConfig } from '../common/AppConfig';
 import {
   DecodedCommand,
   CommandPayload,
   StatusPayload
-} from '../common/protocol/ProtocolTypes'; // ⭐ 移除了未使用的 Payload 类型
-import { TcpClient, TcpMessageEvent } from '../Network/TcpClient'; // ⭐ 移除了未使用的 Error/Config 类型
+} from '../common/protocol/ProtocolTypes';
+
+// ⭐ 修复：全面接入主页同款 TCP 管理器与传输层，放弃不稳定的独立 TcpClient
+import { TcpDeviceManager } from '../Network/TcpDeviceManager';
+import { TcpTransport } from '../common/transport/TcpTransport';
+
 import { getSystemInfo } from '../common/DeviceInfoUtil';
 import { StcOtaController } from '../common/ota/StcOtaController';
 
@@ -39,6 +44,7 @@ export interface MultiSendItem {
   enabled: boolean;
   text: string;
   hex: boolean;
+  remark?: string;
 }
 
 export interface ServiceViewItem {
@@ -67,25 +73,24 @@ export class DebugViewModel {
   selectedWriteUuid: string = '';
   selectedNotifyUuid: string = '';
   currentServiceUuid: string = '';
-  tcpHost: string = '43.138.24.214';
-  tcpPortText: string = '10000';
+  tcpHost: string = AppConfig.SERVER_HOST; 
+
+  tcpPortText: string = AppConfig.ALARM_SERVER_PORT.toString();
   tcpConnectStateText: string = '未连接';
   tcpConnected: boolean = false;
   bleReceiveHex: string = '';
   bleReceiveText: string = '';
   tcpReceiveHex: string = '';
   tcpReceiveText: string = '';
-  recvShowText: boolean = true;
-  recvShowHex: boolean = true;
+  recvDisplayMode: 'TEXT' | 'HEX' = 'HEX';
   sendText: string = '';
   sendAsHex: boolean = false;
   parsedFrames: Array<ParsedFrameViewModel> = [];
   autoSendEnabled: boolean = false;
   autoSendIntervalText: string = '100';
 
-  public uiContext: UIContext | null = null; // ⭐ 添加 UIContext 引用以支持安全弹窗
+  public uiContext: UIContext | null = null; 
 
-  // OTA 状态字段
   isOtaLoading: boolean = false;
   otaProgress: number = 0;
   otaCostTime: string = '0.0';
@@ -95,29 +100,31 @@ export class DebugViewModel {
   currentDeviceType: number = 0xC9;
   currentDeviceAddress: number = 0x01;
   multiSendList: Array<MultiSendItem> = [
-    { id: 1, enabled: true, text: '', hex: true },
-    { id: 2, enabled: true, text: '', hex: true },
-    { id: 3, enabled: true, text: '', hex: true },
-    { id: 4, enabled: true, text: '', hex: true },
-    { id: 5, enabled: true, text: '', hex: true },
-    { id: 6, enabled: true, text: '', hex: true },
-    { id: 7, enabled: true, text: '', hex: true },
-    { id: 8, enabled: true, text: '', hex: true },
+    { id: 1, enabled: true, text: '', hex: true, remark: '' },
+    { id: 2, enabled: true, text: '', hex: true, remark: '' },
+    { id: 3, enabled: true, text: '', hex: true, remark: '' },
+    { id: 4, enabled: true, text: '', hex: true, remark: '' },
+    { id: 5, enabled: true, text: '', hex: true, remark: '' },
+    { id: 6, enabled: true, text: '', hex: true, remark: '' },
+    { id: 7, enabled: true, text: '', hex: true, remark: '' },
+    { id: 8, enabled: true, text: '', hex: true, remark: '' },
   ];
   multiAutoEnabled: boolean = false;
   multiAutoIntervalText: string = '0';
   multiAutoLoopCountText: string = '0';
   alarmActive: boolean = false;
   tamperActive: boolean = false;
-  private tcpClient?: TcpClient;
+  
   private autoSendTimer: number = -1;
   private multiAutoTimer: number = -1;
   private appContext?: common.UIAbilityContext;
-
-  // OTA 控制器实例
   private otaController: StcOtaController;
 
-  // ⭐ 核心修复：移除 Record 类型动态拼装，直接使用符合 ShowToastOptions 的对象字面量，且移除 .catch()
+  virtualMqttCode: string = '';
+  fullSysInfo: string = '';
+  
+  private readonly LISTENER_KEY = 'DebugVM';
+
   private showToastMsg(msg: string, duration?: number): void {
     if (this.uiContext) {
       try {
@@ -131,7 +138,6 @@ export class DebugViewModel {
   }
 
   constructor() {
-    // 初始化 OTA 控制器
     this.otaController = new StcOtaController({
       onSendData: async (data: Uint8Array): Promise<void> => {
         await this.sendRawData(data);
@@ -177,10 +183,10 @@ export class DebugViewModel {
 
   private getDeviceTypeText(type: number): string {
     switch (type) {
-      case DeviceType.Microwave: return '微波设备 (C9)';
-      case DeviceType.Fiber: return '光纤设备 (66)';
-      case DeviceType.Laser: return '激光设备 (19)';
-      default: return `未知设备 (0x${type.toString(16).toUpperCase()})`;
+      case DeviceType.Microwave: return '微波 (C9)';
+      case DeviceType.Fiber: return '光纤 (66)';
+      case DeviceType.Laser: return '激光 (19)';
+      default: return `未知 (0x${type.toString(16).toUpperCase()})`;
     }
   }
 
@@ -191,69 +197,64 @@ export class DebugViewModel {
       return `原始数据: ${ProtocolParser.bytesToHexString(decoded.payload)}`;
     }
     const payload = decoded.payload as CommandPayload;
-    return `Payload Type: ${payload.type}`;
+    return `Type: ${payload.type}`;
   }
 
   private async sendTcpTextGbk(text: string): Promise<void> {
-    if (!this.tcpClient || !this.tcpClient.isConnected) return;
+    if (!this.tcpConnected) return;
     let encoder: util.TextEncoder;
     try {
       encoder = new util.TextEncoder('gb2312');
     } catch (_e) {
       encoder = new util.TextEncoder('utf-8');
     }
-    // ⭐ 修复：sendHexString 是同步返回 void 的，去掉前面的 await
-    this.tcpClient.sendHexString(this.bytesToHexString(encoder.encodeInto(text)).toUpperCase());
+    const hexStr = this.bytesToHexString(encoder.encodeInto(text)).replace(/\s+/g, '').toUpperCase();
+    TcpTransport.getInstance().sendHexString(hexStr);
   }
 
-  private async sendDeviceInfoAndConfirmByTcp(): Promise<void> {
-    if (!this.tcpClient || !this.tcpClient.isConnected || !this.appContext) return;
-    try {
-      const sysInfo = await getSystemInfo();
-      await this.sendTcpTextGbk(sysInfo.info);
-      await this.sendTcpTextGbk('确认更新数据');
-      this.message = '已发送设备信息到 TCP 服务器';
-    } catch (err) {
-      console.error('sendDeviceInfoAndConfirmByTcp error: ' + JSON.stringify(err));
+  public async sendMqttAuth(): Promise<void> {
+    if (!this.tcpConnected) return;
+    if (this.fullSysInfo) {
+      await this.sendTcpTextGbk(this.fullSysInfo);
+      this.message = '已手动发送本机 MQT 信息进行验证';
+      this.showToastMsg('验证包已发送');
     }
   }
 
-  private attachTcpClientHandlers(portNum: number): void {
-    if (!this.tcpClient) return;
-    this.tcpClient.setOnConnect(() => {
-      this.tcpConnected = true;
-      this.tcpConnectStateText = `已连接: ${this.tcpHost}:${portNum}`;
-      this.activeChannel = 'TCP';
-      this.sendDeviceInfoAndConfirmByTcp();
-    });
-    this.tcpClient.setOnClose(() => {
+  // ⭐ 核心修复：直接复用底层 TcpDeviceManager，它内部已包含了完整的 TCP MQT 验证与心跳机制
+  public async onTcpConnectClick(): Promise<void> {
+    if (this.tcpConnected) {
+      try { TcpTransport.getInstance().disconnect(); } catch (e) {}
       this.tcpConnected = false;
       this.tcpConnectStateText = '未连接';
-      this.message = 'TCP 连接已关闭';
-    });
-    this.tcpClient.setOnMessage((event: TcpMessageEvent) => {
-      this.onTcpDataReceived(event);
-    });
-    this.tcpClient.setOnError((error: BusinessError) => {
-      this.tcpConnected = false;
-      this.tcpConnectStateText = '连接错误: ' + error.code;
-      this.message = 'TCP 错误: ' + error.message;
-    });
-  }
-
-  public async onTcpConnectClick(): Promise<void> {
-    if (this.tcpConnected && this.tcpClient) {
-      this.tcpClient.close();
       return;
     }
+    
     const portNum = Number.parseInt(this.tcpPortText);
     if (Number.isNaN(portNum)) return;
 
-    this.tcpClient = new TcpClient({ host: this.tcpHost, port: portNum, timeout: 5000, family: 1 });
-    this.attachTcpClientHandlers(portNum);
     this.tcpConnectStateText = `正在连接...`;
+    
     try {
-      await this.tcpClient.connect();
+      await TcpDeviceManager.instance.connectDevice(this.tcpHost, portNum);
+      
+      this.tcpConnected = true;
+      this.tcpConnectStateText = `已连接: ${this.tcpHost}:${portNum}`;
+      this.activeChannel = 'TCP';
+      this.message = 'TCP 成功接入 (已自动完成底层验证)';
+      
+      const transport = TcpTransport.getInstance();
+      transport.setOnDataReceived(this.LISTENER_KEY, (data: Uint8Array) => {
+        this.onTcpDataReceived(data);
+      });
+      
+      transport.setOnStateChange(this.LISTENER_KEY, (state: string) => {
+         if (state === 'DISCONNECTED') {
+           this.tcpConnected = false;
+           this.tcpConnectStateText = '未连接';
+           this.message = 'TCP 连接已关闭';
+         }
+      });
     } catch (error) {
       this.tcpConnected = false;
       this.tcpConnectStateText = '连接失败';
@@ -261,9 +262,7 @@ export class DebugViewModel {
     }
   }
 
-  private onTcpDataReceived(event: TcpMessageEvent): void {
-    const data = new Uint8Array(event.message);
-
+  private onTcpDataReceived(data: Uint8Array): void {
     if (this.isOtaLoading) {
       this.otaController.processRxData(data);
       return;
@@ -374,19 +373,17 @@ export class DebugViewModel {
   public async sendNewLine(): Promise<void> {
     if (this.activeChannel === 'BLE' && this.connectedDeviceId) {
       gattClientManager.writeText('\r\n');
-    } else if (this.tcpClient?.isConnected) {
+    } else if (this.activeChannel === 'TCP' && this.tcpConnected) {
       await this.sendTcpTextGbk('\r\n');
     }
   }
 
   private async sendRawData(data: Uint8Array): Promise<void> {
     if (this.activeChannel === 'BLE' && this.connectedDeviceId) {
-      // ⭐ 修复：writeBytes 是同步返回 void 的，去掉前面的 await
       gattClientManager.writeBytes(data);
-    } else if (this.activeChannel === 'TCP' && this.tcpClient?.isConnected) {
+    } else if (this.activeChannel === 'TCP' && this.tcpConnected) {
       const hex = this.bytesToHexString(data).replace(/\s+/g, '');
-      // ⭐ 修复：sendHexString 是同步返回 void 的，去掉前面的 await
-      this.tcpClient.sendHexString(hex);
+      TcpTransport.getInstance().sendHexString(hex);
     } else {
       throw new Error('设备未连接');
     }
@@ -427,21 +424,13 @@ export class DebugViewModel {
   }
 
   public copyRecvToArea(): void {
-    let content = '';
-    if (this.recvShowText) {
-      content += this.getCurrentRecvTextRaw();
-    }
-    if (this.recvShowHex) {
-      if (content.length > 0) {
-        content += '\n\n';
-      }
-      content += this.getCurrentRecvHexRaw();
-    }
+    let content = this.recvDisplayMode === 'TEXT' ? this.getCurrentRecvTextRaw() : this.getCurrentRecvHexRaw();
     try {
       const pasteboardData = pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, content);
       const systemPasteboard = pasteboard.getSystemPasteboard();
       systemPasteboard.setData(pasteboardData).then((): void => {
-        this.message = '已复制缓冲区内容到系统剪贴板';
+        this.message = '已复制当前缓冲区内容到系统剪贴板';
+        this.showToastMsg('复制成功');
       }).catch((err: BusinessError) => {
         this.message = '复制失败: ' + err.message;
       });
@@ -453,20 +442,11 @@ export class DebugViewModel {
   public async saveCurrentRecv(context: common.UIAbilityContext): Promise<void> {
     try {
       const preferences = await dataPreferences.getPreferences(context, 'recv_log');
-      let content = '';
-      if (this.recvShowText) {
-        content += this.getCurrentRecvTextRaw();
-      }
-      if (this.recvShowHex) {
-        if (content.length > 0) {
-          content += '\n\n';
-        }
-        content += this.getCurrentRecvHexRaw();
-      }
-      // ⭐ 修复：put 是 Promise，通过 await 在 try..catch 内安全等待结果，移除错误写法的 catch()
+      let content = this.recvDisplayMode === 'TEXT' ? this.getCurrentRecvTextRaw() : this.getCurrentRecvHexRaw();
       await preferences.put('last', content);
       await preferences.flush();
-      this.message = '接收数据已保存到本地偏好 (recv_log)';
+      this.message = '接收数据已保存到本地偏好';
+      this.showToastMsg('保存成功');
     } catch (err) {
       console.error('saveCurrentRecv error: ' + JSON.stringify(err));
       this.message = '保存接收数据失败';
@@ -552,7 +532,7 @@ export class DebugViewModel {
   public onDisappear(): void {
     this.stopAutoSend();
     this.stopMultiAutoSend();
-    this.tcpClient?.close();
+    try { TcpTransport.getInstance().disconnect(); } catch(e) {}
     this.otaController.stop();
   }
 
@@ -625,16 +605,29 @@ export class DebugViewModel {
     });
   }
 
-  public initWithContext(context: common.UIAbilityContext): void {
+  public async initWithContext(context: common.UIAbilityContext): Promise<void> {
     this.appContext = context;
     this.loadMultiSendConfig();
+    
+    // ⭐ 初始化时即提取 MQT，供界面展示，方便后续协议认证使用
+    try {
+      const sysInfo = await getSystemInfo();
+      this.fullSysInfo = sysInfo.info;
+      const match = sysInfo.info.match(/mqt=([^,]+)/);
+      if (match && match[1]) {
+        this.virtualMqttCode = match[1].trim();
+      } else {
+        this.virtualMqttCode = '未生成';
+      }
+    } catch(e) {
+      console.error('getSystemInfo for mqt error', e);
+    }
   }
 
   private async saveMultiSendConfig(): Promise<void> {
     if (this.appContext) {
       try {
         const p = await dataPreferences.getPreferences(this.appContext, 'cfg');
-        // ⭐ 修复：put 是 Promise，必须使用 await 配合 try...catch，移除无返回值的 .catch()
         await p.put('list', JSON.stringify(this.multiSendList));
         await p.flush();
       } catch (e) {
@@ -647,7 +640,6 @@ export class DebugViewModel {
     if (this.appContext) {
       try {
         const p = await dataPreferences.getPreferences(this.appContext, 'cfg');
-        // ⭐ 修复：get 是 Promise，必须使用 await 获取真实数据
         const s = await p.get('list', '') as string;
         if (s) this.multiSendList = JSON.parse(s);
       } catch (e) {

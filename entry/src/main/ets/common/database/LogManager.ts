@@ -110,24 +110,29 @@ export class LogManager {
     }
     predicates.orderByDesc('timestamp'); // 最新在前
 
-    const resultSet = await this.rdbStore.query(predicates);
-    const list: LogEntity[] = [];
+    try {
+      const resultSet = await this.rdbStore.query(predicates);
+      const list: LogEntity[] = [];
 
-    while (resultSet.goToNextRow()) {
-      list.push({
-        id: resultSet.getLong(resultSet.getColumnIndex('id')),
-        timestamp: resultSet.getLong(resultSet.getColumnIndex('timestamp')),
-        timeStr: resultSet.getString(resultSet.getColumnIndex('time_str')),
-        category: resultSet.getString(resultSet.getColumnIndex('category')),
-        actionType: resultSet.getString(resultSet.getColumnIndex('action_type')),
-        deviceName: resultSet.getString(resultSet.getColumnIndex('device_name')),
-        deviceId: resultSet.getString(resultSet.getColumnIndex('device_id')),
-        content: resultSet.getString(resultSet.getColumnIndex('content')),
-        result: resultSet.getLong(resultSet.getColumnIndex('result'))
-      });
+      while (resultSet.goToNextRow()) {
+        list.push({
+          id: resultSet.getLong(resultSet.getColumnIndex('id')),
+          timestamp: resultSet.getLong(resultSet.getColumnIndex('timestamp')),
+          timeStr: resultSet.getString(resultSet.getColumnIndex('time_str')),
+          category: resultSet.getString(resultSet.getColumnIndex('category')),
+          actionType: resultSet.getString(resultSet.getColumnIndex('action_type')),
+          deviceName: resultSet.getString(resultSet.getColumnIndex('device_name')),
+          deviceId: resultSet.getString(resultSet.getColumnIndex('device_id')),
+          content: resultSet.getString(resultSet.getColumnIndex('content')),
+          result: resultSet.getLong(resultSet.getColumnIndex('result'))
+        });
+      }
+      resultSet.close();
+      return list;
+    } catch (e) {
+      console.error('LogManager query failed: ' + e);
+      return [];
     }
-    resultSet.close();
-    return list;
   }
 
   /**
@@ -135,8 +140,12 @@ export class LogManager {
    */
   async clearAllLogs(): Promise<void> {
     if (!this.rdbStore) return;
-    const predicates = new relationalStore.RdbPredicates(this.TABLE_NAME);
-    await this.rdbStore.delete(predicates);
+    try {
+      const predicates = new relationalStore.RdbPredicates(this.TABLE_NAME);
+      await this.rdbStore.delete(predicates);
+    } catch (e) {
+      console.error('LogManager clearAllLogs failed: ' + e);
+    }
   }
 
   /**

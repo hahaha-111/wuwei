@@ -10,6 +10,17 @@ export interface UpdateLogItem {
 // Export the data with explicit type
 export const UPDATE_LOGS: UpdateLogItem[] = [
   {
+    version: 'V2.2.6',
+    date: '2026-06-13',
+    content: [
+      '【高危修复】BLE 通信底层重构：内核引入高可靠性的异步写队列（Write Queue），彻底杜绝高频并发下的指令静默丢失故障',
+      '【高危修复】OTA 状态机加固：独创基于 RTT（物理往返耗时）的启发式拦截算法，完美过滤超时重传导致的“幽灵 ACK”，解决固件升级错乱问题',
+      '【性能】内存与功耗深度调优：修复蓝牙监听器反复注册导致的内存泄漏；阻断设备断连后的 UI 挂起刷新与无用轮询，显著降低耗电发热',
+      '【架构】协议解析引擎大一统：废弃冗余的局部解析器，全局收拢至单一 ProtocolParser，并优雅剥离光纤/电压帧的校验宽容逻辑，消除架构隐患',
+      '【修复】业务防抖打磨：修复高频交替报警时引发的定时器堆积 Bug，确保极速波动下依然能精准、唯一地抓取报警波形现场'
+    ]
+  },
+  {
     version: 'V2.2.5',
     date: '2026-06-12',
     content: [
@@ -152,7 +163,7 @@ export const UPDATE_LOGS: UpdateLogItem[] = [
     date: '2025-12-08',
     content: [
       '【新增】超级调试助手：新增“多数据循环发送”模式，支持压力测试',
-      '【功能】调试模式升级：支持 HEX / 文本 (GBK/UTF-8) 双模式实时切换发送',
+      '【功能】调试模式升级：支持 HEX /文本 (GBK/UTF-8) 双模式实时切换发送',
       '【优化】调试日志接收区增加“一键复制”与“保存到本地”功能',
       '【修复】修复了调试助手在 TCP 断开后自动发送定时器未停止的问题'
     ]
@@ -359,9 +370,9 @@ export struct UpdateLogPopup {
           }
         })
       }
+      .height('100%')
       .layoutWeight(1)
       .width('100%')
-      .height('100%')
       .divider({ strokeWidth: 1, color: '#F5F5F5', startMargin: 0, endMargin: 0 })
 
       Button('关闭')

@@ -3,8 +3,7 @@ import { fileIo as fs, fileUri } from '@kit.CoreFileKit';
 import { common } from '@kit.AbilityKit';
 import { systemShare } from '@kit.ShareKit';
 import { util } from '@kit.ArkTS';
-
-import { MonitorPageParams } from '../viewmodel/MonitorViewModel';
+// ⭐ 移除了 MonitorPageParams
 
 @Entry
 @Component
@@ -14,6 +13,7 @@ struct RecordListPage {
 
   // 传入参数
   deviceName: string = '';
+  deviceKind: string = '';
 
   // 预览状态
   @State previewImagePath: string = '';
@@ -27,7 +27,6 @@ struct RecordListPage {
 
   private uiContext: UIContext | null = null;
 
-  // ⭐ 封装安全的 Toast 方法，避免代码中出现大量的 try-catch 冗余
   private safeShowToast(msg: string) {
     if (this.uiContext) {
       try {
@@ -42,8 +41,18 @@ struct RecordListPage {
     this.uiContext = this.getUIContext();
 
     try {
-      const params = this.getUIContext().getRouter().getParams() as MonitorPageParams;
-      this.deviceName = params?.deviceName || '未知设备';
+      // ⭐ 使用 Record 字典接收路由参数
+      const params = this.getUIContext().getRouter().getParams() as Record<string, Object>;
+      if (params) {
+        if (params['deviceName']) {
+          this.deviceName = params['deviceName'] as string;
+        }
+        if (params['deviceKind']) {
+          this.deviceKind = params['deviceKind'] as string;
+        }
+      } else {
+        this.deviceName = '未知设备';
+      }
     } catch (e) {
       console.error('getParams error:', e);
       this.deviceName = '未知设备';
@@ -68,25 +77,21 @@ struct RecordListPage {
 
   refreshList() {
     this.displayFiles = [];
-    // 刷新列表时，重置选择状态
     this.selectedFiles = [];
     try {
       fs.accessSync(this.currentPath);
       const list = fs.listFileSync(this.currentPath);
-      // 过滤掉隐藏文件，并简单排序
       this.displayFiles = list.filter(f => !f.startsWith('.')).sort();
     } catch (e) {
       console.error('List file failed:', e);
     }
   }
 
-  // 切换编辑模式
   toggleEditMode() {
     this.isEditMode = !this.isEditMode;
-    this.selectedFiles = []; // 切换时清空选择
+    this.selectedFiles = []; 
   }
 
-  // 全选/取消全选
   toggleSelectAll() {
     if (this.selectedFiles.length === this.displayFiles.length) {
       this.selectedFiles = [];
@@ -95,7 +100,6 @@ struct RecordListPage {
     }
   }
 
-  // 切换单个文件选择
   toggleFileSelection(fileName: string) {
     if (this.selectedFiles.includes(fileName)) {
       this.selectedFiles = this.selectedFiles.filter(f => f !== fileName);
@@ -104,7 +108,6 @@ struct RecordListPage {
     }
   }
 
-  // 批量删除
   batchDelete() {
     if (this.selectedFiles.length === 0) return;
 
@@ -137,7 +140,7 @@ struct RecordListPage {
             });
 
             this.safeShowToast(`已删除 ${deletedCount} 个项目`);
-            this.toggleEditMode(); // 退出编辑模式
+            this.toggleEditMode(); 
             this.refreshList();
           }
         }).catch((e: Error) => {
@@ -149,7 +152,6 @@ struct RecordListPage {
     }
   }
 
-  // 批量分享
   batchShare() {
     const filesToShare = this.selectedFiles.filter(f => f.indexOf('.') !== -1);
 
@@ -160,7 +162,6 @@ struct RecordListPage {
 
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
 
-    // ⭐ 终极方案：绝对禁止使用 &&，使用三层纯粹的单条件嵌套，完全迎合 Linter AST 解析树的口味
     if (canIUse('SystemCapability.Share.SystemShare')) {
       if (canIUse('SystemCapability.Collaboration.SystemShare')) {
         if (canIUse('SystemCapability.FileManagement.AppFileService.Core')) {
@@ -218,7 +219,6 @@ struct RecordListPage {
     }
   }
 
-  // 单个删除
   deleteFile(fileName: string) {
     const fullPath = `${this.currentPath}/${fileName}`;
     if (this.uiContext) {
@@ -252,7 +252,6 @@ struct RecordListPage {
   }
 
   onItemClick(name: string) {
-    // 编辑模式下，点击项为选中/取消选中
     if (this.isEditMode) {
       this.toggleFileSelection(name);
       return;
@@ -282,14 +281,16 @@ struct RecordListPage {
   }
 
   playVideo(path: string) {
-    let navParams: MonitorPageParams = {
-      deviceName: this.deviceName,
-      playbackMode: true,
-      playbackFilePath: path
-    };
+    // ⭐ 使用 Record 字典构建路由参数
+    const navParams: Record<string, Object> = {};
+    navParams['deviceName'] = this.deviceName;
+    navParams['playbackMode'] = true;
+    navParams['playbackFilePath'] = path;
+    navParams['deviceKind'] = this.deviceKind;
+
     if (this.uiContext) {
       try {
-        this.uiContext.getRouter().pushUrl({
+        this.uiContext.getRouter().replaceUrl({
           url: 'pages/MonitorPage',
           params: navParams
         }, router.RouterMode.Standard).catch((e: Error) => {
@@ -319,7 +320,6 @@ struct RecordListPage {
     const fullPath = `${this.currentPath}/${fileName}`;
     const context = this.getUIContext().getHostContext() as common.UIAbilityContext;
 
-    // ⭐ 终极方案：同理严格逐层嵌套，避开 AST 解析缺陷
     if (canIUse('SystemCapability.Share.SystemShare')) {
       if (canIUse('SystemCapability.Collaboration.SystemShare')) {
         if (canIUse('SystemCapability.FileManagement.AppFileService.Core')) {
@@ -361,16 +361,13 @@ struct RecordListPage {
 
   build() {
     Stack() {
-      // 1. 主文件列表
       Column() {
-        // 顶部导航
         Row() {
           Button('< 返回')
             .onClick(() => {
               const ctx = this.getUIContext().getHostContext() as common.UIAbilityContext;
               const root = `${ctx.filesDir}/无畏/${this.deviceName}`;
 
-              // 如果在编辑模式，优先退出编辑模式
               if (this.isEditMode) {
                 this.toggleEditMode();
                 return;
@@ -398,7 +395,6 @@ struct RecordListPage {
 
           Blank()
 
-          // 管理按钮
           Button(this.isEditMode ? '取消' : '管理')
             .fontSize(16)
             .backgroundColor(Color.Transparent)
@@ -429,7 +425,6 @@ struct RecordListPage {
           ForEach(this.displayFiles, (item: string) => {
             ListItem() {
               Row() {
-                // 编辑模式：显示复选框
                 if (this.isEditMode) {
                   Checkbox()
                     .select(this.selectedFiles.includes(item))
@@ -451,9 +446,8 @@ struct RecordListPage {
                 }
                 .layoutWeight(1)
                 .alignItems(HorizontalAlign.Start)
-                .onClick(() => this.onItemClick(item)) // 点击整行也能触发
+                .onClick(() => this.onItemClick(item)) 
 
-                // 非编辑模式：显示操作按钮
                 if (!this.isEditMode && item.indexOf('.') !== -1) {
                   Button('分享')
                     .fontSize(12)
@@ -491,7 +485,6 @@ struct RecordListPage {
         .width('100%')
         .height('100%')
 
-        // 底部批量操作栏
         if (this.isEditMode) {
           Row() {
             Row() {
@@ -529,7 +522,6 @@ struct RecordListPage {
       .height('100%')
       .backgroundColor('#FFFFFF')
 
-      // 2. 图片预览遮罩
       if (this.previewImagePath) {
         Column() {
           Stack({ alignContent: Alignment.TopEnd }) {
@@ -583,7 +575,6 @@ struct RecordListPage {
         })
       }
 
-      // 3. 文本/CSV查看遮罩
       if (this.isViewingText) {
         Column() {
           Row() {

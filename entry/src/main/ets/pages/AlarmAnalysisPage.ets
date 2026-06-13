@@ -88,7 +88,11 @@ struct AlarmAnalysisPage {
       const err = e as BusinessError;
       this.isSearching = false;
       if (this.uiContext) {
-        this.getUIContext().getPromptAction().showToast({ message: `连接异常: ${err.message}` });
+        try {
+          this.getUIContext().getPromptAction().showToast({ message: `连接异常: ${err.message}` });
+        } catch (toastErr) {
+          console.error('AlarmAnalysis showToast failed: ' + toastErr);
+        }
       }
       console.error('AlarmAnalysis', `连接或识别失败: ${err.message}`);
     }

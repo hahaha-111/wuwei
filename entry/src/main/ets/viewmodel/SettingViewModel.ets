@@ -15,12 +15,7 @@ import { DeviceNameManager } from '../common/DeviceNameManager';
 import { LogManager } from '../common/database/LogManager';
 import { LogCategory } from '../common/database/LogEntity';
 
-export interface SettingPageParams {
-  deviceName?: string;
-  deviceType?: number;
-  connectionMode?: string;
-  deviceAddress?: number;
-}
+// ⭐ 已删除死代码 SettingPageParams
 
 @Observed
 export class SettingViewModel {
@@ -99,7 +94,6 @@ export class SettingViewModel {
   private timeRefreshTimer: number = 0;
   private nameManager: DeviceNameManager | null = null;
 
-  // ⭐ 新增：用于缓存上一次日志记录的完整参数字符串，保证不变化不记录
   private lastLoggedConfig: string = '';
 
   private readonly LISTENER_KEY = 'SettingVM';
@@ -108,9 +102,8 @@ export class SettingViewModel {
     this.transport = TransportManager.getInstance().getTransport();
   }
 
-
   // ================= 生命周期 =================
-  async init(params: SettingPageParams | undefined, ctx?: common.UIAbilityContext): Promise<void> {
+  async init(params: Record<string, Object> | undefined, ctx?: common.UIAbilityContext): Promise<void> {
     if (ctx !== undefined) {
       this.nameManager = await DeviceNameManager.getInstance(ctx);
       await LogManager.getInstance().init(ctx);
@@ -122,12 +115,12 @@ export class SettingViewModel {
     }
 
     if (params) {
-      if (params.deviceType !== undefined) this.deviceType = params.deviceType;
-      if (params.connectionMode !== undefined) this.connectionMode = params.connectionMode;
-      if (params.deviceAddress !== undefined) this.currentAddress = params.deviceAddress;
-      if (params.deviceName !== undefined) {
-        this.deviceName = params.deviceName;
-        this.originalDeviceName = params.deviceName;
+      if (params['deviceType'] !== undefined) this.deviceType = params['deviceType'] as number;
+      if (params['connectionMode'] !== undefined) this.connectionMode = params['connectionMode'] as string;
+      if (params['deviceAddress'] !== undefined) this.currentAddress = params['deviceAddress'] as number;
+      if (params['deviceName'] !== undefined) {
+        this.deviceName = params['deviceName'] as string;
+        this.originalDeviceName = params['deviceName'] as string;
       }
     }
 
@@ -163,7 +156,6 @@ export class SettingViewModel {
     }
   }
 
-  // ⭐ 新增：统一收集当前所有配置并缓存比对，控制只有发生变化才写入日志库
   private logFullConfiguration(action: string): void {
     let configStr = '';
     if (this.deviceType === DeviceType.Fiber) {
@@ -259,7 +251,6 @@ export class SettingViewModel {
       send(0x79);
     }
 
-    // ⭐ 新增：待所有读取指令完毕后，检查并汇总当前系统配置并记录日志
     setTimeout(() => {
       if (this.hasReceivedAnyConfig) {
         this.logFullConfiguration('读取全部参数');
@@ -306,7 +297,6 @@ export class SettingViewModel {
       setTimeout((): void => this.applyCommMode(), delay += step);
     }
 
-    // ⭐ 新增：批量下发结束时记录配置大日志
     setTimeout((): void => {
       this.sendSaveCommand();
       this.logFullConfiguration('批量保存参数');
@@ -318,15 +308,13 @@ export class SettingViewModel {
 
   updateDeviceNameInput(v: string): void { this.deviceName = v; }
 
+  // ⭐ 修复：清理了空 catch 以及毫无意义的 throw
   async applyDeviceName(): Promise<void> {
     if (!this.transport.isConnected()) {
-      try {
       this.tipText = '请先连接设备';
-      } catch (error) {
-        // TODO: Implement error handling.
-      }
       return;
     }
+    
     if (!this.nameManager) return;
 
     let targetIdHex = this.currentDeviceIdHex;
@@ -460,7 +448,6 @@ export class SettingViewModel {
     this.logSetting(`修改光纤${ch}增益`, `倍率修改为: ${val}`);
   }
 
-  // --- 原始微波方法保留 ---
   updateAlarmFactorInput(v: string): void {
     const n = this.parseIntInRange(v, 100, 65535);
     if (n >= 0) { this.alarmFactor = n; this.alarmFactorText = n.toString(); } else { this.alarmFactorText = v; }

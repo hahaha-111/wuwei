@@ -4,10 +4,10 @@
       {
         "name": "default",
         "material": {
-          "storePassword": "000000201B5B4B1099FA2232E94D45E5F63736F6E5DA2B684AC4930EF9EFF13A0A431E94328431B4E4BB771582B6E42E",
+          "storePassword": "0000002029C6D194CBF4D2C74B15467A20F964553109B776B439694B03A379FB1FC2E5064A3AB2BE216CFDBC8771C4D7",
           "certpath": "/storage/Users/currentUser/appdata/el2/base/com.huawei.devecostudio/files/ohos/config/default_wuwei3XCmjCMIoqafLQmdKhNUZ_clIFpV_tcoBdKw-oP4duc.cer",
           "keyAlias": "debugKey",
-          "keyPassword": "000000201B5B4B1099FA2232E94D45E5F63736F6E5DA2B684AC4930EF9EFF13A0A431E94328431B4E4BB771582B6E42E",
+          "keyPassword": "0000002029C6D194CBF4D2C74B15467A20F964553109B776B439694B03A379FB1FC2E5064A3AB2BE216CFDBC8771C4D7",
           "profile": "/storage/Users/currentUser/appdata/el2/base/com.huawei.devecostudio/files/ohos/config/default_wuwei3XCmjCMIoqafLQmdKhNUZ_clIFpV_tcoBdKw-oP4duc.p7b",
           "signAlg": "SHA256withECDSA",
           "storeFile": "/storage/Users/currentUser/appdata/el2/base/com.huawei.devecostudio/files/ohos/config/default_wuwei3XCmjCMIoqafLQmdKhNUZ_clIFpV_tcoBdKw-oP4duc.p12"

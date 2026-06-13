@@ -4,30 +4,16 @@ import gattClientManager from '../bluetooth/GattClientManager';
 import { DebugViewModel, MultiSendItem, ServiceViewItem, CharViewItem } from '../viewmodel/DebugViewModel';
 
 // === 样式常量 ===
-const COLOR_PRIMARY: string = '#1976D2';       // 选中：蓝底
-const COLOR_PRIMARY_LIGHT: string = '#E0E0E0'; // 未选中：灰底
+const COLOR_PRIMARY: string = '#1976D2';       
+const COLOR_PRIMARY_LIGHT: string = '#E0E0E0'; 
 const COLOR_SUCCESS: string = '#43A047';
 const COLOR_DANGER: string = '#E53935';
 const COLOR_PANEL_BG: string = '#1a000000';
 const COLOR_INPUT_BG: string = '#12ffffff';
 
 const FONT_SIZE_TITLE: number = 14;
-const FONT_SIZE_NORMAL: number = 10; // ⭐ 修改：调整为 10
+const FONT_SIZE_NORMAL: number = 10; 
 const FONT_SIZE_HINT: number = 11;
-
-// Tab 按钮
-@Builder
-function TabButton(text: string, active: boolean, onClick: () => void) {
-  Button(text)
-  // 当前通道：蓝底；其他：灰底
-    .backgroundColor(active ? COLOR_PRIMARY : COLOR_PRIMARY_LIGHT)
-    // ★ 为了确认新代码生效，先把字体改成「黑色」
-    .fontColor(Color.Black)
-    .width('48%')
-    .height(36)
-    .borderRadius(6)
-    .onClick(onClick);
-}
 
 @Entry
 @Component
@@ -35,10 +21,10 @@ struct Index {
   @State vm: DebugViewModel = new DebugViewModel();
 
   aboutToAppear() {
-    // ⭐ 修复警告：使用 API 13 专用的 getHostContext
     const ctx = this.getUIContext().getHostContext() as common.UIAbilityContext;
+    this.vm.uiContext = this.getUIContext();
     this.vm.initBleCallbacks();
-    this.vm.initWithContext(ctx); // 加载多字符串配置
+    this.vm.initWithContext(ctx); 
   }
 
   aboutToDisappear() {
@@ -54,22 +40,28 @@ struct Index {
         .fontWeight(FontWeight.Medium)
         .margin({ top: 2, bottom: 4 })
 
-      // ★ 调试用，直接显示当前通道
-      Text('当前通道：' + this.vm.activeChannel)
-        .fontSize(12)
-        .fontColor(Color.Gray)
-        .margin({ bottom: 4 })
-
       Row() {
-        TabButton('BLE 调试', this.vm.activeChannel === 'BLE', () => {
-          this.vm.activeChannel = 'BLE';
-        })
+        Button('BLE 调试')
+          .backgroundColor(this.vm.activeChannel === 'BLE' ? COLOR_PRIMARY : COLOR_PRIMARY_LIGHT)
+          .fontColor(this.vm.activeChannel === 'BLE' ? Color.White : Color.Black)
+          .width('48%')
+          .height(36)
+          .borderRadius(6)
+          .onClick(() => {
+            this.vm.activeChannel = 'BLE';
+          })
 
         Blank().width('4%')
 
-        TabButton('TCP 调试', this.vm.activeChannel === 'TCP', () => {
-          this.vm.activeChannel = 'TCP';
-        })
+        Button('TCP 调试')
+          .backgroundColor(this.vm.activeChannel === 'TCP' ? COLOR_PRIMARY : COLOR_PRIMARY_LIGHT)
+          .fontColor(this.vm.activeChannel === 'TCP' ? Color.White : Color.Black)
+          .width('48%')
+          .height(36)
+          .borderRadius(6)
+          .onClick(() => {
+            this.vm.activeChannel = 'TCP';
+          })
       }
       .margin({ bottom: 6 })
     }
@@ -91,7 +83,6 @@ struct Index {
             .backgroundColor(this.vm.scanning ? COLOR_DANGER : COLOR_PRIMARY) 
             .fontColor(Color.White)
             .onClick(async () => {
-              // ⭐ 修复警告：使用 API 13 专用的 getHostContext
               const ctx = this.getUIContext().getHostContext() as common.UIAbilityContext;
               if (this.vm.scanning) {
                 this.vm.stopBleScan();
@@ -160,10 +151,25 @@ struct Index {
             .fontColor(Color.White)
             .onClick(async () => { await this.vm.onTcpConnectClick(); })
         }
-      } else {
-        Text('已连接到 TCP 服务器，断开请使用下方控制区按钮')
+        
+        Text(`本机验证码 (MQT): ${this.vm.virtualMqttCode || '生成中...'}`)
           .fontSize(FONT_SIZE_HINT)
-          .opacity(0.6)
+          .fontColor(COLOR_PRIMARY)
+          .margin({ top: 4 })
+          .alignSelf(ItemAlign.Start)
+      } else {
+        Row() {
+          Text(`已连接到 TCP 服务器 | 本机 MQT: ${this.vm.virtualMqttCode}`)
+            .fontSize(FONT_SIZE_HINT)
+            .opacity(0.6)
+            .layoutWeight(1)
+          
+          Button('发送 MQT 验证')
+            .fontSize(10)
+            .height(26)
+            .backgroundColor('#FF9800')
+            .onClick(() => { this.vm.sendMqttAuth(); })
+        }.width('100%').alignItems(VerticalAlign.Center)
       }
     }
     .margin({ bottom: 8 })
@@ -198,7 +204,6 @@ struct Index {
         ForEach(this.vm.devices, (item: BleDevice) => {
           ListItem() {
             Row() {
-              // 1. 设备图标
               Column() {
                 Text('BLE')
                   .fontSize(10)
@@ -212,7 +217,6 @@ struct Index {
               .borderRadius(18)
               .margin({ right: 10 })
 
-              // 2. 设备信息
               Column() {
                 Text(item.name && item.name.length > 0 ? item.name : '未知设备')
                   .fontSize(16)
@@ -229,14 +233,12 @@ struct Index {
               .layoutWeight(1)
               .alignItems(HorizontalAlign.Start)
 
-              // 3. 信号强度
               Column() {
                 Text(`${item.rssi} dBm`)
                   .fontSize(12)
                   .fontWeight(FontWeight.Bold)
                   .fontColor(item.rssi > -60 ? COLOR_SUCCESS : (item.rssi > -80 ? '#FF9800' : COLOR_DANGER))
 
-                // 信号条动画
                 Row({ space: 2 }) {
                   Rect().width(3).height(4).fill(item.rssi > -90 ? '#666' : '#eee')
                   Rect().width(3).height(6).fill(item.rssi > -80 ? '#666' : '#eee')
@@ -279,30 +281,33 @@ struct Index {
             .margin({ bottom: 4 })
 
           Row() {
-            Checkbox()
-              .select(this.vm.recvShowText)
-              .onChange((value: boolean) => { this.vm.recvShowText = value; })
-
-            Text('文本模式')
+            Button('文本')
               .fontSize(FONT_SIZE_NORMAL)
-              .margin({ left: 4 })
-          }
-          .margin({ bottom: 4 })
+              .backgroundColor(this.vm.recvDisplayMode === 'TEXT' ? COLOR_PRIMARY : '#FFFFFF')
+              .fontColor(this.vm.recvDisplayMode === 'TEXT' ? Color.White : COLOR_PRIMARY)
+              .borderRadius(4)
+              .border({ width: 1, color: COLOR_PRIMARY })
+              .height(26)
+              .layoutWeight(1)
+              .margin({ right: 4, bottom: 8 })
+              .onClick(() => { this.vm.recvDisplayMode = 'TEXT'; })
 
-          Row() {
-            Checkbox()
-              .select(this.vm.recvShowHex)
-              .onChange((value: boolean) => { this.vm.recvShowHex = value; })
-
-            Text('HEX模式')
+            Button('HEX')
               .fontSize(FONT_SIZE_NORMAL)
-              .margin({ left: 4 })
+              .backgroundColor(this.vm.recvDisplayMode === 'HEX' ? COLOR_PRIMARY : '#FFFFFF')
+              .fontColor(this.vm.recvDisplayMode === 'HEX' ? Color.White : COLOR_PRIMARY)
+              .borderRadius(4)
+              .border({ width: 1, color: COLOR_PRIMARY })
+              .height(26)
+              .layoutWeight(1)
+              .margin({ bottom: 8 })
+              .onClick(() => { this.vm.recvDisplayMode = 'HEX'; })
           }
-          .margin({ bottom: 8 })
 
           Button('清空接收区')
             .fontSize(FONT_SIZE_NORMAL)
             .margin({ bottom: 4 })
+            .width('100%')
             .onClick(() => {
               if (this.vm.activeChannel === 'BLE') {
                 this.vm.bleReceiveHex = '';
@@ -316,102 +321,39 @@ struct Index {
           Button('保存接收数据')
             .fontSize(FONT_SIZE_NORMAL)
             .margin({ bottom: 4 })
+            .width('100%')
             .onClick(async () => {
-              // ⭐ 修复警告：使用 API 13 专用的 getHostContext
               const ctx = this.getUIContext().getHostContext() as common.UIAbilityContext;
               await this.vm.saveCurrentRecv(ctx);
             })
 
-          Button('复制接收数据') 
+          Button('复制当前缓冲') 
             .fontSize(FONT_SIZE_NORMAL)
+            .width('100%')
             .onClick(() => {
               this.vm.copyRecvToArea();
             })
         }
-        .width(110)
+        .width(130)
         .margin({ right: 6 })
 
-        // 右侧显示区
+        // 右侧统一显示区
         Column() {
-          if (this.vm.recvShowText && this.vm.recvShowHex) {
-            Row() {
-              Text('文本缓冲区')
-                .fontSize(FONT_SIZE_HINT)
-                .layoutWeight(1)
-                .margin({ bottom: 4 })
+          Text(this.vm.recvDisplayMode === 'HEX' ? 'HEX 视图' : '文本 视图')
+            .fontSize(FONT_SIZE_HINT)
+            .margin({ bottom: 4 })
 
-              Text('HEX缓冲区')
-                .fontSize(FONT_SIZE_HINT)
-                .layoutWeight(1)
-                .margin({ left: 4, bottom: 4 })
-            }
-            .width('100%')
-
-            Row() {
-              Scroll() {
-                Text(this.vm.getCurrentRecvTextRaw().length > 0 ? this.vm.getCurrentRecvTextRaw() : '尚未收到文本数据')
-                  .fontSize(FONT_SIZE_NORMAL)
-                  .opacity(0.85)
-              }
-              .layoutWeight(1)
-              .width('100%')
-              .height(260)
-              .backgroundColor(COLOR_PANEL_BG)
-              .padding(4)
-
-              Blank().width(4)
-
-              Scroll() {
-                Text(this.vm.getCurrentRecvHexRaw().length > 0 ? this.vm.getCurrentRecvHexRaw() : '尚未收到 HEX 数据')
-                  .fontSize(FONT_SIZE_NORMAL)
-                  .opacity(0.85)
-              }
-              .layoutWeight(1)
-              .width('100%')
-              .height(260)
-              .backgroundColor(COLOR_PANEL_BG)
-              .padding(4)
-            }
-            .width('100%')
-          } else if (this.vm.recvShowText) {
-            Text('文本缓冲区')
-              .fontSize(FONT_SIZE_HINT)
-              .margin({ bottom: 4 })
-
-            Scroll() {
-              Text(this.vm.getCurrentRecvTextRaw().length > 0 ? this.vm.getCurrentRecvTextRaw() : '尚未收到文本数据')
-                .fontSize(FONT_SIZE_NORMAL)
-                .opacity(0.85)
-            }
-            .width('100%')
-            .height(260)
-            .backgroundColor(COLOR_PANEL_BG)
-            .padding(4)
-          } else if (this.vm.recvShowHex) {
-            Text('HEX缓冲区')
-              .fontSize(FONT_SIZE_HINT)
-              .margin({ bottom: 4 })
-
-            Scroll() {
-              Text(this.vm.getCurrentRecvHexRaw().length > 0 ? this.vm.getCurrentRecvHexRaw() : '尚未收到 HEX 数据')
-                .fontSize(FONT_SIZE_NORMAL)
-                .opacity(0.85)
-            }
-            .width('100%')
-            .height(260)
-            .backgroundColor(COLOR_PANEL_BG)
-            .padding(4)
-          } else {
-            Scroll() {
-              Text('未选择任何显示模式')
-                .fontSize(FONT_SIZE_NORMAL)
-                .opacity(0.7)
-            }
-            .width('100%')
-            .height(260)
-            .backgroundColor(COLOR_PANEL_BG)
-            .padding(4)
+          Scroll() {
+            Text(this.vm.recvDisplayMode === 'HEX' 
+              ? (this.vm.getCurrentRecvHexRaw().length > 0 ? this.vm.getCurrentRecvHexRaw() : '尚未收到 HEX 数据')
+              : (this.vm.getCurrentRecvTextRaw().length > 0 ? this.vm.getCurrentRecvTextRaw() : '尚未收到文本数据'))
+              .fontSize(FONT_SIZE_NORMAL)
+              .opacity(0.85)
           }
+          .width('100%')
+          .height(180)
+          .backgroundColor(COLOR_PANEL_BG)
+          .padding(4)
         }
         .layoutWeight(1)
         .width('100%')
@@ -420,7 +362,7 @@ struct Index {
     .margin({ bottom: 8 })
   }
 
-  /* ========== OTA 设置区域 (新增) ========== */
+  /* ========== OTA 设置区域 ========== */
   @Builder
   OtaSettingsSection() {
     Column() {
@@ -446,7 +388,6 @@ struct Index {
           .selectedColor(COLOR_PRIMARY)
           .showSteps(true)
           .layoutWeight(2)
-          // ⭐ 修复警告：移除未使用的 mode 参数
           .onChange((value: number) => {
             this.vm.otaDelayMs = Math.round(value);
           })
@@ -469,7 +410,6 @@ struct Index {
           .selectedColor(COLOR_PRIMARY)
           .showSteps(true)
           .layoutWeight(2)
-          // ⭐ 修复警告：移除未使用的 mode 参数
           .onChange((value: number) => {
             this.vm.otaPacketSize = Math.round(value);
           })
@@ -561,97 +501,98 @@ struct Index {
         .fontWeight(FontWeight.Bold)
         .margin({ bottom: 2 })
 
-      // 标题行
       Row() {
-        Blank().width(32)
-
-        Text('发送')
-          .fontSize(FONT_SIZE_NORMAL)
-          .width(48)
-
-        Text('行')
-          .fontSize(FONT_SIZE_NORMAL)
-          .width(26)
-
-        Text('内容')
-          .fontSize(FONT_SIZE_NORMAL)
-          .layoutWeight(1)
-
-        Text('HEX')
-          .fontSize(FONT_SIZE_NORMAL)
-          .width(40)
-          .margin({ left: 8 })
+        Text('启用').fontSize(FONT_SIZE_NORMAL).width(32).textAlign(TextAlign.Center)
+        Text('行号').fontSize(FONT_SIZE_NORMAL).width(46).textAlign(TextAlign.Center).margin({ left: 4 })
+        Text('内容').fontSize(FONT_SIZE_NORMAL).layoutWeight(2).margin({ left: 4 })
+        Text('HEX').fontSize(FONT_SIZE_NORMAL).width(32).textAlign(TextAlign.Center).margin({ left: 4 })
+        Text('备注').fontSize(FONT_SIZE_NORMAL).layoutWeight(1).margin({ left: 4 })
       }
       .margin({ bottom: 4 })
       .width('100%')
 
-      // 每一行
       Scroll() {
         Column() {
           ForEach(this.vm.multiSendList, (item: MultiSendItem, index: number) => {
             Row() {
-              Row() {
-                Checkbox()
-                  .select(this.vm.multiSendList[index]?.enabled ?? false)
-                  .width(32)
-                  .onChange((v: boolean) => {
-                    this.vm.updateMultiSendItem(item.id, (oldItem: MultiSendItem) => {
-                      return {
-                        id: oldItem.id,
-                        enabled: v,
-                        text: oldItem.text,
-                        hex: oldItem.hex
-                      };
-                    });
-                  })
-
-                Blank().width(4)
-
-                Button(item.id.toString())
-                  .fontSize(FONT_SIZE_NORMAL)
-                  .width(64)
-                  .height(40)
-                  .backgroundColor(COLOR_SUCCESS)
-                  .fontColor(Color.White)
-                  .onClick(() => {
-                    const freshItem = this.vm.multiSendList[index];
-                    if (freshItem) {
-                      this.vm.sendOneMultiItem(freshItem);
-                    }
-                  })
-
-                Blank().width(8)
-
-                TextInput({
-                  text: this.vm.multiSendList[index]?.text ?? '',
-                  placeholder: ''
+              Checkbox()
+                .select(this.vm.multiSendList[index]?.enabled ?? false)
+                .width(32)
+                .onChange((v: boolean) => {
+                  this.vm.updateMultiSendItem(item.id, (oldItem: MultiSendItem) => {
+                    return {
+                      id: oldItem.id,
+                      enabled: v,
+                      text: oldItem.text,
+                      hex: oldItem.hex,
+                      remark: oldItem.remark
+                    };
+                  });
                 })
-                  .onChange((v: string) => {
-                    this.vm.updateMultiSendItem(item.id, (oldItem: MultiSendItem) => {
-                      return {
-                        id: oldItem.id,
-                        enabled: oldItem.enabled,
-                        text: v,
-                        hex: oldItem.hex
-                      };
-                    });
-                  })
-                  .height(32)
-                  .layoutWeight(1)
-              }
-              .layoutWeight(1)
+
+              Button(item.id.toString())
+                .fontSize(FONT_SIZE_NORMAL)
+                .width(46)
+                .height(32)
+                .margin({ left: 4 })
+                .backgroundColor(COLOR_SUCCESS)
+                .fontColor(Color.White)
+                .onClick(() => {
+                  const freshItem = this.vm.multiSendList[index];
+                  if (freshItem) { this.vm.sendOneMultiItem(freshItem); }
+                })
+
+              TextInput({
+                text: this.vm.multiSendList[index]?.text ?? '',
+                placeholder: '内容'
+              })
+                .height(32)
+                .layoutWeight(2)
+                .margin({ left: 4 })
+                .onChange((v: string) => {
+                  this.vm.updateMultiSendItem(item.id, (oldItem: MultiSendItem) => {
+                    return {
+                      id: oldItem.id,
+                      enabled: oldItem.enabled,
+                      text: v,
+                      hex: oldItem.hex,
+                      remark: oldItem.remark
+                    };
+                  });
+                })
 
               Checkbox()
                 .select(this.vm.multiSendList[index]?.hex ?? false)
-                .width(40)
-                .margin({ left: 8 })
+                .width(32)
+                .margin({ left: 4 })
                 .onChange((v: boolean) => {
                   this.vm.updateMultiSendItem(item.id, (oldItem: MultiSendItem) => {
                     return {
                       id: oldItem.id,
                       enabled: oldItem.enabled,
                       text: oldItem.text,
-                      hex: v
+                      hex: v,
+                      remark: oldItem.remark
+                    };
+                  });
+                })
+
+              TextInput({
+                text: this.vm.multiSendList[index]?.remark ?? '',
+                placeholder: '备注'
+              })
+                .height(32)
+                .layoutWeight(1)
+                .margin({ left: 4 })
+                .padding({ left: 6, right: 6 }) 
+                .onChange((v: string) => {
+                  this.vm.updateMultiSendItem(item.id, (oldItem: MultiSendItem) => {
+                    return {
+                      id: oldItem.id,
+                      enabled: oldItem.enabled,
+                      text: oldItem.text,
+                      hex: oldItem.hex,
+                      remark: v
                     };
                   });
                 })
@@ -662,10 +603,9 @@ struct Index {
         }
         .padding({ right: 4 })
       }
-      .height(220)
+      .height(260) 
       .width('100%')
 
-      // 清空 & 自动循环
       Row() {
         Button('清空全部数据')
           .fontSize(FONT_SIZE_NORMAL)
@@ -688,7 +628,6 @@ struct Index {
       .margin({ top: 40 })
       .width('100%')
 
-      // 自动发送 + 周期(ms)
       Row() {
         Button(this.vm.autoSendEnabled ? '停止自动发送' : '自动发送')
           .fontSize(FONT_SIZE_NORMAL)
@@ -711,7 +650,6 @@ struct Index {
       .margin({ top: 8 })
       .width('100%')
 
-      // 多串间隔 + 循环次数
       Row() {
         Text('多串间隔(ms)')
           .fontSize(FONT_SIZE_HINT)
@@ -742,7 +680,6 @@ struct Index {
   @Builder
   BottomControlSection() {
     Column() {
-      // ⭐ OTA 进度条 (只有 OTA 进行时显示)
       if (this.vm.isOtaLoading) {
         Column() {
           Row() {
@@ -770,8 +707,6 @@ struct Index {
             .onClick(async () => {
               if (this.vm.activeChannel === 'TCP') {
                 await this.vm.onTcpConnectClick();
-                this.vm.tcpConnected = false;
-                this.vm.tcpConnectStateText = '未连接';
               } else {
                 gattClientManager.stopConnect();
                 this.vm.connectedDeviceId = '';
@@ -799,14 +734,12 @@ struct Index {
 
         Blank().width(4)
 
-        // ⭐ OTA 升级入口
         Button('OTA 升级')
           .fontSize(FONT_SIZE_NORMAL)
           .height(32)
           .backgroundColor('#FF9800') 
           .fontColor(Color.White)
           .onClick(() => {
-            // ⭐ 修复警告：使用 API 13 专用的 getHostContext
             const ctx = this.getUIContext().getHostContext() as common.UIAbilityContext;
             this.vm.pickFileAndStartOTA(ctx);
           })
@@ -845,7 +778,7 @@ struct Index {
                 this.vm.currentServiceUuid = svc.uuid;
               })
 
-              // 特征值项 (如果选中该服务，或者全部展开)
+              // 特征值项
               if (this.vm.currentServiceUuid === svc.uuid) {
                 Column() {
                   ForEach(svc.characteristics, (ch: CharViewItem) => {
@@ -857,7 +790,6 @@ struct Index {
                       .alignItems(HorizontalAlign.Start)
                       .layoutWeight(1)
 
-                      // 勾选写
                       if (ch.canWrite) {
                         Row() {
                           Checkbox()
@@ -869,7 +801,6 @@ struct Index {
                         }.margin({ left: 4 })
                       }
 
-                      // 勾选Notify
                       if (ch.canNotify) {
                         Row() {
                           Checkbox()
@@ -893,7 +824,7 @@ struct Index {
       }
       .layoutWeight(1)
       .width('100%')
-      .height('100%') // ⭐ 修复警告：补全了 List 缺失的高度声明
+      .height('100%')
 
       Row() {
         Button('取消')
@@ -924,10 +855,9 @@ struct Index {
     .zIndex(1000) 
   }
 
-  /* ========== 根 build：左侧收发 + 右侧多字符串 ========== */
+  /* ========== 根 build ========== */
   build() {
     Stack() {
-      // 主内容
       Scroll() {
         Column() {
           this.TopHeaderSection();
@@ -944,13 +874,13 @@ struct Index {
                   this.OtaSettingsSection();
                   this.SendPanelSection();
                 }
-                .width('65%')
+                .width('60%') 
                 .margin({ right: 6 })
 
                 Column() {
                   this.MultiSendPanelSection();
                 }
-                .width('35%')
+                .width('40%')
                 .margin({ left: 8 })
               }
               .alignItems(VerticalAlign.Top)
@@ -967,13 +897,13 @@ struct Index {
                   this.OtaSettingsSection();
                   this.SendPanelSection();
                 }
-                .width('65%')
+                .width('60%')
                 .margin({ right: 6 })
 
                 Column() {
                   this.MultiSendPanelSection();
                 }
-                .width('35%')
+                .width('40%')
                 .margin({ left: 8 })
               }
               .alignItems(VerticalAlign.Top)
@@ -988,7 +918,6 @@ struct Index {
       .width('100%')
       .height('100%')
 
-      // 服务选择弹窗蒙层
       if (this.vm.showServiceSelector) {
         Column()
           .width('100%')

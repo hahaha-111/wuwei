@@ -9,7 +9,7 @@ import { TcpTransport } from '../common/transport/TcpTransport';
 import { util } from '@kit.ArkTS';
 
 import pasteboard from '@ohos.pasteboard';
-import { UIContext, router } from '@kit.ArkUI'; // ⭐ 修复：统一引入 UIContext 与 router，去除 promptAction
+import { UIContext, router } from '@kit.ArkUI'; 
 import window from '@ohos.window';
 import dataPreferences from '@ohos.data.preferences';
 
@@ -29,6 +29,7 @@ import { i18n } from '@kit.LocalizationKit';
 
 import { LogManager } from '../common/database/LogManager';
 import { LogCategory } from '../common/database/LogEntity';
+import { AppConfig } from '../common/AppConfig';
 
 type Resource = resourceManager.Resource;
 
@@ -69,7 +70,6 @@ export class HomePageBleViewModel {
   // ⭐ 光纤：记录探测到的设备地址
   detectedFiberAddress: number = 0x01;
 
-
   versionName: string = '';
 
   staMode: boolean = false;
@@ -93,8 +93,10 @@ export class HomePageBleViewModel {
     { value: '日本語', icon: $r('app.media.icon_foreground') }
   ];
 
-  tcpIp: string = '43.138.24.214';
-  tcpPort: string = '10000';
+ 
+  tcpIp: string = AppConfig.SERVER_HOST; 
+    // 修复2：使用 .toString() 将 number 转换为 string
+    tcpPort: string = AppConfig.ALARM_SERVER_PORT.toString();
   showTcpDialog: boolean = false;
   tcpListConnected: boolean = false;
 
@@ -454,17 +456,18 @@ export class HomePageBleViewModel {
     else if (kind === 'FIBER') { deviceType = DeviceType.Fiber; deviceKind = 'FIBER'; }
     
     if (this.uiContext) {
+      // ⭐ 修复：使用 Record 字典传递参数，并补上缺失的逗号，完美避开所有编译报错！
+      const navParams: Record<string, Object> = {};
+      navParams['screenType'] = this.screenType;
+      if (deviceType !== undefined) navParams['deviceType'] = deviceType;
+      if (deviceKind !== undefined) navParams['deviceKind'] = deviceKind;
+      navParams['connectionMode'] = (this.staMode || this.tcpMode) ? 'TCP' : 'BLE';
+      navParams['deviceName'] = this.selectedDeviceName;
+      navParams['deviceAddress'] = this.detectedFiberAddress;
+
       this.uiContext.getRouter().pushUrl({
         url: 'pages/MonitorPage',
-        params: {
-          screenType: this.screenType,
-          deviceType: deviceType,
-          deviceKind: deviceKind,
-          connectionMode: (this.staMode || this.tcpMode) ? 'TCP' : 'BLE',
-          // ⭐ 传递点击列表时选择的名称
-          deviceName: this.selectedDeviceName,
-          deviceAddress: this.detectedFiberAddress,
-        }
+        params: navParams
       }, router.RouterMode.Standard).catch(() => {});
     }
   }
@@ -491,7 +494,6 @@ export class HomePageBleViewModel {
     this.closeTcpListClient();
     if (!await this.ensureAuthorized(false)) return;
 
-    // ⭐ 在点击设备时，记录用户点击的列表名称
     this.selectedDeviceName = item.name;
 
     this.updateDeviceStatus(item.id, this.getString($r('app.string.device_status_connecting'), '正在连接'));
@@ -546,12 +548,12 @@ export class HomePageBleViewModel {
     this.isSearching = true; 
     this.searchTip = '正在连接服务器请求报警分析数据...';
 
-    const ip = this.tcpIp;
-    const port = parseInt(this.tcpPort);
+    const ip = AppConfig.SERVER_HOST;
+    const port = AppConfig.ALARM_SERVER_PORT
 
     this.closeTcpListClient(); 
-    this.tcpListClient = new TcpClient({ host: ip, port: port, timeout: 5000 });
-
+   // this.tcpListClient = new TcpClient({ host: ip, port: port, timeout: 5000 });
+   this.tcpListClient = new TcpClient({ host: ip, port: port, timeout: 5000 });
     this.receiveBuffer = '';
     if (this.receiveTimer) {
       clearTimeout(this.receiveTimer);
@@ -645,8 +647,8 @@ export class HomePageBleViewModel {
   }
 
   private async autoFetchTcpList() {
-    const ip = '43.138.24.214';
-    const port = 10000;
+    const ip = AppConfig.SERVER_HOST
+    const port = AppConfig.ALARM_SERVER_PORT
 
     this.closeTcpListClient();
     this.isSearching = true;
@@ -888,7 +890,6 @@ export class HomePageBleViewModel {
     if (!this.machineCode) return;
     try {
       const data = pasteboard.createData(pasteboard.MIMETYPE_TEXT_PLAIN, this.machineCode);
-    
       await pasteboard.getSystemPasteboard().setData(data);
       this.showToastMsg(this.getString($r('app.string.toast_copy_machine_code_success'), '已复制')); 
     } catch (e) {
@@ -898,7 +899,6 @@ export class HomePageBleViewModel {
 
   async pasteRegisterCode(): Promise<void> {
     try {
-    
       const data = await pasteboard.getSystemPasteboard().getData();
       if (data) {
         const text = data.getPrimaryText();
