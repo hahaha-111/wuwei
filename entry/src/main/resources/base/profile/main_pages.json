@@ -1,6 +1,6 @@
 {
   "src": [
-    "pages/Index",
+    "pages/DebugPage",
     "pages/HomePage",
     "pages/MonitorPage",
     "pages/CalibratePage",

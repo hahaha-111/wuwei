@@ -484,7 +484,7 @@ struct HomePage {
         .margin({ left: 10, right: 8 })
         .height(32)
         .onClick(() => {
-          this.getUIContext().getRouter().pushUrl({ url: 'pages/Index' }).catch(() => {});
+          this.getUIContext().getRouter().pushUrl({ url: 'pages/DebugPage' }).catch(() => {});
         })
 
       Button($r('app.string.btn_monitor_test'))
