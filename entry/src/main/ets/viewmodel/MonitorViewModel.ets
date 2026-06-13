@@ -183,6 +183,8 @@ export class MonitorViewModel {
   public currentDeviceAddress: number = 0x01;
   private lastProbeTime: number = 0;
   private hasSyncedTime: boolean = false;
+  // ⭐ P3: 记录上次下发校时指令的物理时间，冷却期内不重复同步
+  private lastTimeSyncTick: number = 0;
 
   waveIntervalMs: number = 40;
   displayPointCount: number = 60;
@@ -836,12 +838,16 @@ export class MonitorViewModel {
           const deviceTime = new Date(t.year, t.month - 1, t.day, t.hour, t.minute, t.second).getTime();
           const localTime = Date.now();
           if (Math.abs(deviceTime - localTime) > 2000) {
-            if (!this.hasSyncedTime) {
+            // ⭐ P3: 冷却重试机制 — 从未同步过，或距离上次同步已过10分钟(600s)则允许重试
+            if (!this.hasSyncedTime || (localTime - this.lastTimeSyncTick > 600_000)) {
               this.hasSyncedTime = true;
+              this.lastTimeSyncTick = localTime;
               this.syncTimeToDevice();
+              console.info('MonitorVM', '触发设备时钟校准');
             }
           } else {
             this.hasSyncedTime = false;
+            this.lastTimeSyncTick = 0;
           }
         } catch (e) {
           console.error('Time sync error:', e);
