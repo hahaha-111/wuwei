@@ -26,6 +26,7 @@ export class GattClientManager {
   private rawDataCallback?: (data: Uint8Array) => void;
   private frameCallback?: (frame: ProtocolFrame) => void;
 
+  private writeQueue: Uint8Array[] = [];
   private writeBusy: boolean = false;
 
   public setDebugLog(): void {
@@ -151,25 +152,40 @@ export class GattClientManager {
   public writeBytes(data: Uint8Array) {
     if (!this.gattClient || !this.writeChar) return;
 
-    // 简单的忙锁，生产环境可用队列优化
-    if (this.writeBusy) return;
+    this.writeQueue.push(data);
+    this.processWriteQueue();
+  }
+
+  private processWriteQueue(): void {
+    if (this.writeBusy || this.writeQueue.length === 0) {
+      return;
+    }
+
     this.writeBusy = true;
+    const dataToSend = this.writeQueue.shift();
+    if (!dataToSend || !this.gattClient) {
+      this.writeBusy = false;
+      this.processWriteQueue();
+      return;
+    }
 
     const characteristic: ble.BLECharacteristic = {
       serviceUuid: this.serviceUuid,
       characteristicUuid: this.writeCharUuid,
-      characteristicValue: data.buffer,
-      descriptors: this.writeChar.descriptors ?? []
+      characteristicValue: dataToSend.buffer,
+      descriptors: this.writeChar?.descriptors ?? []
     };
 
     try {
       this.gattClient.writeCharacteristicValue(characteristic, this.writeType, (err?: BusinessError) => {
         this.writeBusy = false;
         if (err) console.error(TAG, `writeBytes error: ${err.code}`);
+        this.processWriteQueue();
       });
     } catch (e) {
       this.writeBusy = false;
       console.error(TAG, `writeBytes exception: ${e}`);
+      this.processWriteQueue();
     }
   }
 

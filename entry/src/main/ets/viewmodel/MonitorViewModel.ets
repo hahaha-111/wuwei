@@ -904,13 +904,27 @@ export class MonitorViewModel {
 
   private handleAutoDownload(isAlarm: boolean) {
     if (!this.autoDownload || !this.context) return;
+
     if (isAlarm && !this.isAlarmingLocked) {
       this.isAlarmingLocked = true;
+
+      // ⭐ P0: 设置新定时器前，先清掉旧的防止堆积
+      if (this.alarmDebounceTimer !== -1) {
+        clearTimeout(this.alarmDebounceTimer);
+      }
+
       this.alarmDebounceTimer = setTimeout(() => {
         this.saveAlarmSnapshot();
       }, 2500);
+
     } else if (!isAlarm) {
       this.isAlarmingLocked = false;
+
+      // ⭐ P0: 报警恢复时，截断未执行的截图任务
+      if (this.alarmDebounceTimer !== -1) {
+        clearTimeout(this.alarmDebounceTimer);
+        this.alarmDebounceTimer = -1;
+      }
     }
   }
 
@@ -1131,11 +1145,19 @@ export class MonitorViewModel {
     if (connected) {
       this.startTimeSyncLoop();
       this.startWaveCommandTimer();
+      this.startWaveUiTimer();
     } else {
+      // ⭐ P0: 断开时彻底停掉所有定时器，防止后台空跑
       this.stopWaveCommandTimer();
       this.stopTimeSyncLoop();
+      this.stopWaveUiTimer();
       this.clearLogState();
       this.pendingLogs = [];
+
+      // 重置波形数据，避免 UI 停留在最后一帧乱码
+      this.signalVm.clearBuffer();
+      this.avgValue = 0;
+      this.variance = 0;
     }
   }
 
