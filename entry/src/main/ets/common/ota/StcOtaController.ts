@@ -47,6 +47,8 @@ export class StcOtaController {
   private startTime: number = 0;
   private retryCount: number = 0;
   private timeoutTimer: number = -1;
+  // ⭐ P2: 记录最后一次发包的物理时间戳，用于 RTT 时间差拦截幽灵 ACK
+  private lastSendTime: number = 0;
 
   private callbacks: StcOtaCallbacks;
 
@@ -162,14 +164,13 @@ export class StcOtaController {
       return;
     }
 
-    // 清除超时，重置重试
-    this.clearTimeout();
-    this.retryCount = 0;
-
-    // 状态机流转
+    // ⭐ P2: 状态机流转（不在此统一 clearTimeout，由各 case 自行管理
+    //          防止幽灵 ACK 进入 SENDING 后回车杀掉了等待中的超时定时器）
     switch (this.state) {
       case OtaState.WAIT_CONNECT_ACK:
         if (cmd === STC_CMD_CONNECT) {
+          this.clearTimeout();
+          this.retryCount = 0;
           this.callbacks.onMessage('握手成功，正在擦除 App 区 (请稍候)...');
           this.sendRawData(new Uint8Array([STC_CMD_ERASE_APP]));
           this.state = OtaState.WAIT_ERASE_ACK;
@@ -179,6 +180,8 @@ export class StcOtaController {
 
       case OtaState.WAIT_ERASE_ACK:
         if (cmd === STC_CMD_ERASE_APP) {
+          this.clearTimeout();
+          this.retryCount = 0;
           this.callbacks.onMessage('擦除完成，开始写入...');
           this.state = OtaState.SENDING;
           this.sendNextPacket();
@@ -187,7 +190,18 @@ export class StcOtaController {
 
       case OtaState.SENDING:
         if (cmd === STC_CMD_WRITE_DATA) {
-          // 收到 ACK，更新 Offset
+          // ⭐ P2: STC 协议 ACK 只有 4 字节(HEAD+CMD+STATUS+TAIL)，不带 offset
+          //       用 RTT 时间差启发式拦截超时后的幽灵 ACK
+          const rtt = Date.now() - this.lastSendTime;
+          if (rtt < 60) {
+            console.warn(`OTA_DEBUG: 丢弃幽灵 ACK (RTT=${rtt}ms)，等待超时重试`);
+            // 不杀定时器，让现有 timeout 触发重试
+            return;
+          }
+
+          this.clearTimeout();
+          this.retryCount = 0;
+
           const remaining = this.fileBuffer.byteLength - this.currentOffset;
           const justSentLen = (remaining > this.packetSize) ? this.packetSize : remaining;
           this.currentOffset += justSentLen;
@@ -203,6 +217,8 @@ export class StcOtaController {
 
       case OtaState.WAIT_RUN_ACK:
         if (cmd === STC_CMD_RUN_APP) {
+          this.clearTimeout();
+          this.retryCount = 0;
           this.handleSuccess();
         }
         break;
@@ -257,6 +273,7 @@ export class StcOtaController {
 
   private async sendRawData(data: Uint8Array): Promise<void> {
     try {
+      this.lastSendTime = Date.now(); // ⭐ P2: 记录发送时间戳
       await this.callbacks.onSendData(data);
     } catch (e) {
       console.error('OTA Send Error', JSON.stringify(e));
