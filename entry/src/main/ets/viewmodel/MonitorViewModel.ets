@@ -571,11 +571,11 @@ export class MonitorViewModel {
       }
     });
 
-    this.transport.setOnDataReceived(this.LISTENER_KEY, (data): void => {
+    this.transport.setOnDataReceived(this.LISTENER_KEY, (data: Uint8Array): void => {
       if (this.isPlaybackMode) return;
 
       const frames = this.protocolParser.feed(data);
-      frames.forEach((f): void => {
+      frames.forEach((f: ProtocolFrame): void => {
         this.onFrameReceived(f);
       });
     });
