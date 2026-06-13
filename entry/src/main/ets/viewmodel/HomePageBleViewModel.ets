@@ -462,7 +462,7 @@ export class HomePageBleViewModel {
           deviceKind: deviceKind,
           connectionMode: (this.staMode || this.tcpMode) ? 'TCP' : 'BLE',
           // ⭐ 传递点击列表时选择的名称
-          deviceName: this.selectedDeviceName 
+          deviceName: this.selectedDeviceName,
           deviceAddress: this.detectedFiberAddress,
         }
       }, router.RouterMode.Standard).catch(() => {});

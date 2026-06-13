@@ -1,5 +1,4 @@
 import { common } from '@kit.AbilityKit';
-import { promptAction } from '@kit.ArkUI';
 
 import { TransportManager } from '../common/transport/TransportManager';
 import { ITransport } from '../common/transport/ITransport';
@@ -322,7 +321,7 @@ export class SettingViewModel {
   async applyDeviceName(): Promise<void> {
     if (!this.transport.isConnected()) {
       try {
-        promptAction.showToast({ message: '请先连接设备' });
+      this.tipText = '请先连接设备';
       } catch (error) {
         // TODO: Implement error handling.
       }
@@ -354,7 +353,7 @@ export class SettingViewModel {
       this.logSetting('修改名称', `本地修改名称为: ${this.deviceName}`);
     }
 
-    try { promptAction.showToast({ message: '名称修改成功' }); } catch (_) {}
+    this.tipText = '名称修改成功';
   }
 
   updateSensorTimeInput(v: string): void { this.sensorTime = v; }
@@ -393,7 +392,7 @@ export class SettingViewModel {
   applyChannel(): void {
     if (!this.transport.isConnected()) return;
     if (this.deviceType === DeviceType.Fiber) {
-      try { promptAction.showToast({ message: '光纤设备暂只支持手动硬件拨码调节通道!' }); } catch (_) {}
+      this.tipText = '光纤设备暂只支持手动硬件拨码调节通道!';
       return;
     }
 

@@ -300,7 +300,7 @@ export class AlarmAnalysisViewModel {
         const data = new Uint8Array(event.message);
         try {
           const decoder = new util.TextDecoder('gbk', { ignoreBOM: true });
-          this.receiveBuffer += decoder.decodeWithStream(data);
+          this.receiveBuffer += decoder.decodeToString(data);
         } catch (e) {
           console.error('GBK解码异常', e);
         }
