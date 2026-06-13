@@ -52,7 +52,8 @@ export class AdapterManager {
   // 开启蓝牙
   public openBluetooth() {
     try {
-      // 注册蓝牙状态变化事件监听器，当蓝牙状态变化时触发回调函数
+      // ⭐ P1: 先注销旧监听再注册，防止重复叠加泄漏
+      access.off('stateChange', this.onReceiveEvent);
       access.on('stateChange', this.onReceiveEvent);
     } catch (err) {
       console.error('errCode: ' + (err as BusinessError).code + ', errMessage: ' + (err as BusinessError).message);

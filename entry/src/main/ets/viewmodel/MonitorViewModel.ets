@@ -89,61 +89,6 @@ export interface LogDeviceInfo {
   id: string;
 }
 
-class LocalProtocolParser {
-  private buffer: number[] = [];
-
-  public feed(input: Uint8Array): ProtocolFrame[] {
-    for (let i = 0; i < input.length; i++) {
-      this.buffer.push(input[i]);
-    }
-    const frames: ProtocolFrame[] = [];
-
-    while (this.buffer.length >= 5) {
-      if (this.buffer[0] !== 0xFF) {
-        this.buffer.shift();
-        continue;
-      }
-      const len = this.buffer[3];
-      const totalLen = 5 + len;
-
-      if (this.buffer.length < totalLen) {
-        break;
-      }
-
-      const frameBytes = this.buffer.slice(0, totalLen);
-      let sum = 0;
-      for (let i = 2; i < totalLen - 1; i++) {
-        sum += frameBytes[i];
-      }
-      const calcCs = sum & 0xFF;
-      const recvCs = frameBytes[totalLen - 1];
-
-      const deviceType = frameBytes[2];
-      const isFiber = (deviceType === 0x66);
-      const cmdByte = len > 0 ? frameBytes[4] : 0;
-      const isVoltage = (cmdByte === 0x97);
-
-      if (calcCs === recvCs || isFiber || isVoltage) {
-        const data = new Uint8Array(frameBytes.slice(4, 4 + len));
-        const frame: ProtocolFrame = {
-          raw: new Uint8Array(frameBytes),
-          address: frameBytes[1],
-          deviceType: frameBytes[2],
-          dataLength: len,
-          data: data,
-          checksum: recvCs,
-          checksumOk: true
-        };
-        frames.push(frame);
-        this.buffer.splice(0, totalLen);
-      } else {
-        this.buffer.shift();
-      }
-    }
-    return frames;
-  }
-}
-
 @Observed
 export class MonitorViewModel {
   deviceMode: DeviceMode = 'UNKNOWN';
@@ -232,7 +177,8 @@ export class MonitorViewModel {
   connectionMode: 'BLE' | 'TCP' = 'BLE';
   isConnected: boolean = false;
   private transport: ITransport;
-  private protocolParser: LocalProtocolParser = new LocalProtocolParser();
+  // ⭐ P1: 统一使用全局 ProtocolParser，自定义校验在全业务层处理
+  private protocolParser: ProtocolParser = new ProtocolParser();
 
   public currentDeviceAddress: number = 0x01;
   private lastProbeTime: number = 0;
@@ -641,6 +587,14 @@ export class MonitorViewModel {
     const cmdByte = (frame.data && frame.data.length > 0) ? frame.data[0] : 0;
     if (cmdByte !== 0) {
       console.info('MonitorVM', `◀ 收到帧: cmd=0x${cmdByte.toString(16).toUpperCase()} dataLen=${frame.dataLength}`);
+    }
+
+    // ⭐ P1: 使用统一的全局 ProtocolParser，校验宽容规则放在业务层
+    const isFiber = (frame.deviceType === 0x66);
+    const isVoltage = (cmdByte === 0x97);
+    if (!frame.checksumOk && !isFiber && !isVoltage) {
+      console.warn('MonitorVM', `[校验和错误] 丢弃脏帧: DeviceType=${frame.deviceType}`);
+      return;
     }
 
     const decoded = ProtocolDecoder.decode(frame.deviceType, frame.data);
