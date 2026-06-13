@@ -378,6 +378,11 @@ export class MonitorViewModel {
 
     const isConn = this.transport.isConnected();
     this.setConnected(isConn);
+
+    // ⭐ 光纤设备初次加载：主动调用 readDeviceParams 唤醒设备
+    if (this.deviceMode === 'FIBER') {
+      this.readDeviceParams();
+    }
   }
 
   destroy(): void {
@@ -562,6 +567,11 @@ export class MonitorViewModel {
       if (this.isPlaybackMode) return;
       const isConn = (state === 'CONNECTED');
       this.setConnected(isConn);
+
+    // ⭐ 光纤设备初次加载：主动调用 readDeviceParams 唤醒设备
+    if (this.deviceMode === 'FIBER') {
+      this.readDeviceParams();
+    }
       if (state === 'DISCONNECTED') {
         this.addLog(LogCategory.CONNECTION, '设备断开', '检测到连接中断', deviceId || '-');
         this.showToastMsg('设备已断开');

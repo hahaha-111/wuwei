@@ -66,6 +66,9 @@ export class HomePageBleViewModel {
 
   // ⭐ 新增：记录被选中的列表名称
   selectedDeviceName: string = '';
+  // ⭐ 光纤：记录探测到的设备地址
+  detectedFiberAddress: number = 0x01;
+
 
   versionName: string = '';
 
@@ -354,6 +357,7 @@ export class HomePageBleViewModel {
   private handleDeviceDetectFrame(frame: ProtocolFrame) {
     if (!this.detectingDevice) return;
     if (frame.deviceType === 0x66) {
+      this.detectedFiberAddress = frame.address;
       this.resolveDetectedKind('FIBER');
     }
     else if (frame.deviceType === 0xC9 && frame.data.length >= 1) {
@@ -459,6 +463,7 @@ export class HomePageBleViewModel {
           connectionMode: (this.staMode || this.tcpMode) ? 'TCP' : 'BLE',
           // ⭐ 传递点击列表时选择的名称
           deviceName: this.selectedDeviceName 
+          deviceAddress: this.detectedFiberAddress,
         }
       }, router.RouterMode.Standard).catch(() => {});
     }
