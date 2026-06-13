@@ -1,8 +1,8 @@
-import { router } from '@kit.ArkUI'; // ⭐ 修改：统一使用 ArkUI 路由
+import { router } from '@kit.ArkUI';
 import { common } from '@kit.AbilityKit';
 import { LogViewModel, LogGroup } from '../viewmodel/LogViewModel';
 import { LogEntity, LogCategory } from '../common/database/LogEntity';
-import { MonitorPageParams } from '../viewmodel/MonitorViewModel';
+// ⭐ 移除了 MonitorPageParams
 import { DeviceType } from '../common/ProtocolParser';
 
 @Extend(Text) function navLabel(active: boolean) {
@@ -16,18 +16,29 @@ import { DeviceType } from '../common/ProtocolParser';
 struct LogPage {
   @State vm: LogViewModel = new LogViewModel();
   private currentTab: string = 'log';
-  // 列表滚动控制器
   private listScroller: Scroller = new Scroller();
 
-  // 保存上次选择的日期，避免每次打开都重置为今天
   @State pickedDate: Date = new Date();
 
   aboutToAppear() {
-    // ⭐ 修复：全面注入 UIContext，并替换废弃获取参数的方式
     this.vm.uiContext = this.getUIContext();
     const ctx = this.getUIContext().getHostContext() as common.UIAbilityContext;
-    const params = this.getUIContext().getRouter().getParams() as MonitorPageParams;
+    
+    // ⭐ 使用 Record 字典接收路由参数
+    let params: Record<string, Object> | undefined = undefined;
+    try {
+      params = this.getUIContext().getRouter().getParams() as Record<string, Object>;
+    } catch (e) {
+      console.error('Get params failed', e);
+    }
+    
     this.vm.init(ctx, params);
+  }
+
+  private safeShowToast(msg: string) {
+    try {
+      this.getUIContext().getPromptAction().showToast({ message: msg });
+    } catch (e) {}
   }
 
   private goTo(tab: string) {
@@ -36,20 +47,19 @@ struct LogPage {
     }
 
     if (tab === 'calibrate' && this.vm.deviceType !== DeviceType.Microwave) {
-      try { this.getUIContext().getPromptAction().showToast({ message: '当前设备不支持校准功能' }); } catch (e) {}
+      this.safeShowToast('当前设备不支持校准功能');
       return;
     }
 
-    const navParams: MonitorPageParams = {
-      deviceName: this.vm.deviceNameDisplay,
-      deviceType: this.vm.deviceType,
-      connectionMode: this.vm.connectionMode,
-      deviceAddress: this.vm.currentDeviceAddress
-    };
+    // ⭐ 使用 Record 字典构建路由参数
+    const navParams: Record<string, Object> = {};
+    navParams['deviceName'] = this.vm.deviceNameDisplay;
+    navParams['deviceType'] = this.vm.deviceType;
+    navParams['connectionMode'] = this.vm.connectionMode;
+    navParams['deviceAddress'] = this.vm.currentDeviceAddress;
 
     const uiRouter = this.getUIContext().getRouter();
     
-    // ⭐ 修复：统一使用安全抛出包裹的路由
     try {
       if (tab === 'home') {
         uiRouter.replaceUrl({ url: 'pages/MonitorPage', params: navParams }, router.RouterMode.Standard).catch(() => {});
@@ -70,7 +80,6 @@ struct LogPage {
 
   private showDatePickerDialog() {
     try {
-      // ⭐ 修复警告：弃用全局 DatePickerDialog，改用绑定的上下文调用
       this.getUIContext().showDatePickerDialog({
         start: new Date('2020-01-01'),
         end: new Date('2030-12-31'),
@@ -90,9 +99,9 @@ struct LogPage {
               setTimeout(() => {
                 this.listScroller.scrollToIndex(flatIndex, true, ScrollAlign.START);
               }, 100);
-              try { this.getUIContext().getPromptAction().showToast({ message: `已跳转至 ${targetDateStr}` }); } catch (e) {}
+              this.safeShowToast(`已跳转至 ${targetDateStr}`);
             } else {
-              try { this.getUIContext().getPromptAction().showToast({ message: `日期 ${targetDateStr} 无记录` }); } catch (e) {}
+              this.safeShowToast(`日期 ${targetDateStr} 无记录`);
             }
           }
         }
@@ -122,14 +131,10 @@ struct LogPage {
 
   private getCategoryColor(cat: string): string {
     switch (cat) {
-      case LogCategory.MAINTENANCE:
-        return '#D32F2F';
-      case LogCategory.SETTING:
-        return '#1976D2';
-      case LogCategory.CONNECTION:
-        return '#388E3C';
-      default:
-        return '#616161';
+      case LogCategory.MAINTENANCE: return '#D32F2F';
+      case LogCategory.SETTING: return '#1976D2';
+      case LogCategory.CONNECTION: return '#388E3C';
+      default: return '#616161';
     }
   }
 
@@ -220,7 +225,6 @@ struct LogPage {
     .border({ width: { bottom: 1 }, color: '#E0E0E0' })
     .onClick(() => {
       try {
-        // ⭐ 修复警告：改用 UIContext 的内置动画执行方法
         this.getUIContext().animateTo({ duration: 250, curve: Curve.FastOutSlowIn }, () => {
           this.vm.toggleGroup(date);
         });
@@ -234,7 +238,6 @@ struct LogPage {
     Column() {
       this.topNavBar()
 
-      // 工具与筛选栏
       Column() {
         Row() {
           Text('操作日志')
@@ -269,7 +272,6 @@ struct LogPage {
             .backgroundColor('#E53935')
             .onClick(() => {
               try {
-                // ⭐ 修复警告：替换废弃的全局弹窗调用
                 this.getUIContext().showAlertDialog({
                   title: '清空日志',
                   message: '确定要清空所有操作日志吗？此操作不可恢复。',
@@ -293,7 +295,6 @@ struct LogPage {
         .width('100%')
         .margin({ bottom: 8 })
 
-        // 搜索框区域
         Row() {
           TextInput({
             text: this.vm.filterText,
@@ -309,7 +310,6 @@ struct LogPage {
             })
             .layoutWeight(1)
 
-          // 日历跳转按钮
           Button({ type: ButtonType.Circle, stateEffect: true }) {
             Text('📅')
               .fontSize(18)
@@ -329,7 +329,6 @@ struct LogPage {
       .backgroundColor(Color.White)
       .border({ width: { bottom: 1 }, color: '#EEEEEE' })
 
-      // 日志列表
       List({ scroller: this.listScroller }) {
         if (this.vm.groupedLogs.length === 0) {
           ListItem() {
@@ -352,12 +351,10 @@ struct LogPage {
           ForEach(
             this.vm.groupedLogs,
             (group: LogGroup) => {
-              // 1. 日期头 ListItem
               ListItem() {
                 this.dateHeaderBuilder(group.date, group.expanded)
               }
 
-              // 2. 若展开，渲染子项
               if (group.expanded) {
                 ForEach(
                   group.items,
@@ -367,18 +364,16 @@ struct LogPage {
                     }
                     .transition({ type: TransitionType.All, opacity: 0, scale: { y: 0.95 } })
                   },
-                  // 使用 item 的 id 作为唯一键，防止列表刷新闪烁
                   (item: LogEntity, index: number) => item.id ? item.id.toString() : `${index}_${item.timeStr}`
                 )
               }
             },
-            // ⭐ 核心修复：将 expanded 状态拼接进 Key 中，强制 ArkUI 在折叠/展开时重新绘制当前日期的数据块
             (group: LogGroup) => group.date + '_' + group.expanded
           )
         }
       }
       .width('100%')
-      .height('100%') // ⭐ 修复警告：补全了 List 缺失的明确高度声明属性
+      .height('100%') 
       .layoutWeight(1)
       .backgroundColor(Color.White)
     }

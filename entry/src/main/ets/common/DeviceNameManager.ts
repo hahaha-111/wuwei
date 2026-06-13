@@ -26,7 +26,11 @@ export class DeviceNameManager {
   }
 
   private async init() {
-    this.pref = await preferences.getPreferences(this.context, DeviceNameManager.PREF_NAME);
+    try {
+      this.pref = await preferences.getPreferences(this.context, DeviceNameManager.PREF_NAME);
+    } catch (e) {
+      console.error('DeviceNameManager init failed: ' + e);
+    }
   }
 
   /**
@@ -36,8 +40,13 @@ export class DeviceNameManager {
    */
   public async getName(deviceIdHex: string): Promise<string> {
     if (!this.pref) return "";
-    const name = await this.pref.get(deviceIdHex, "");
-    return name as string;
+    try {
+      const name = await this.pref.get(deviceIdHex, "");
+      return name as string;
+    } catch (e) {
+      console.error('DeviceNameManager getName failed: ' + e);
+      return "";
+    }
   }
 
   /**
@@ -47,8 +56,12 @@ export class DeviceNameManager {
    */
   public async saveName(deviceIdHex: string, name: string): Promise<void> {
     if (!this.pref) return;
-    await this.pref.put(deviceIdHex, name);
-    await this.pref.flush();
+    try {
+      await this.pref.put(deviceIdHex, name);
+      await this.pref.flush();
+    } catch (e) {
+      console.error('DeviceNameManager saveName failed: ' + e);
+    }
   }
 
   /**
@@ -59,14 +72,16 @@ export class DeviceNameManager {
     if (!this.pref) return "FFFFFFFFFFFFFFFFFFFF";
 
     // 1. 读取 Max Address
-    const currentMax = await this.pref.get(DeviceNameManager.KEY_MAX_ADDRESS, 0) as number;
-
-    // 2. 增加 1
-    const newAddress = currentMax + 1;
-
-    // 3. 保存新的 Max Address
-    await this.pref.put(DeviceNameManager.KEY_MAX_ADDRESS, newAddress);
-    await this.pref.flush();
+    let newAddress: number;
+    try {
+      const currentMax = await this.pref.get(DeviceNameManager.KEY_MAX_ADDRESS, 0) as number;
+      newAddress = currentMax + 1;
+      await this.pref.put(DeviceNameManager.KEY_MAX_ADDRESS, newAddress);
+      await this.pref.flush();
+    } catch (e) {
+      console.error('DeviceNameManager generateNewId failed: ' + e);
+      return "FFFFFFFFFFFFFFFFFFFF";
+    }
 
     // 4. 生成 Hex 字符串
     let hex = newAddress.toString(16).toUpperCase();

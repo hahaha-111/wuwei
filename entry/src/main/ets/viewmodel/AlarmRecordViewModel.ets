@@ -1,7 +1,6 @@
 import { common } from '@kit.AbilityKit';
 import { ProtocolFrame, DeviceType, ProtocolParser } from '../common/ProtocolParser';
 import { UIContext, router } from '@kit.ArkUI'; 
-import { MonitorPageParams } from '../viewmodel/MonitorViewModel';
 import { TransportManager } from '../common/transport/TransportManager';
 import { ITransport } from '../common/transport/ITransport';
 import { LogManager } from '../common/database/LogManager';
@@ -33,10 +32,7 @@ export interface AlarmRecord {
   hasWaveform: boolean;
 }
 
-// ⭐ 修复1：将 interface 改为 class，解决 Interfaces cannot extend classes 报错
-export class AlarmPageParams extends MonitorPageParams {
-  deviceName?: string;
-}
+// ⭐ 已删除死代码 AlarmPageParams 和 MonitorPageParams 的引入
 
 interface AlarmLogState {
   alarmCount?: number;
@@ -132,7 +128,6 @@ export class AlarmRecordViewModel {
     }
   }
 
-  // ⭐ 修复2：改用 Record 字典安全提取参数，彻底解决参数与类型推断报错
   init(params: Record<string, Object> | undefined, ctx: common.UIAbilityContext): void {
     this.context = ctx;
     LogManager.getInstance().init(ctx);
