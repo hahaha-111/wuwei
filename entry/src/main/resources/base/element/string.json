@@ -323,6 +323,10 @@
     {
       "name": "ReadPasteboard",
       "value": "用于读取剪贴板中的设备注册码进行授权验证"
+    },
+    {
+      "name": "UseNearLink",
+      "value": "用于扫描和连接附近的星闪设备"
     }
   ]
 }

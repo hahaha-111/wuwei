@@ -15,9 +15,10 @@ import dataPreferences from '@ohos.data.preferences';
 
 import AdapterManager from '../bluetooth/AdapterManager';
 import bleScanManager, { BleDevice } from '../bluetooth/BleSearch';
+import sleScanManager, { SleDevice } from '../bluetooth/SleSearch';
 import gattClientManager from '../bluetooth/GattClientManager';
 import { PermissionUtil } from '../utils/PermissionUtil';
-import { BLE_PERMISSIONS } from '../utils/PermissionsConfig';
+import { BLE_PERMISSIONS, SLE_PERMISSIONS } from '../utils/PermissionsConfig';
 
 import { LicenseManager, LicenseCheckResult } from '../common/LicenseManager';
 
@@ -74,6 +75,7 @@ export class HomePageBleViewModel {
 
   staMode: boolean = false;
   tcpMode: boolean = false;
+  sleMode: boolean = false;  // ⭐ 星闪模式
 
   // 授权相关
   isAuthorized: boolean = false;
@@ -288,7 +290,7 @@ export class HomePageBleViewModel {
 
   private initGattConnectionListener() {
     gattClientManager.setOnConnectionStateChange((state: ble.ProfileConnectionState, deviceId: string) => {
-      if (this.staMode || this.tcpMode) return;
+      if (this.staMode || this.tcpMode || this.sleMode) return;
       if (state === constant.ProfileConnectionState.STATE_CONNECTED) {
         this.connectedDeviceId = deviceId;
         this.refreshLocalizedText();
@@ -314,7 +316,7 @@ export class HomePageBleViewModel {
 
   private initGattDataListener() {
     gattClientManager.setOnFrameReceived((frame: ProtocolFrame) => {
-      if (this.staMode || this.tcpMode) return;
+      if (this.staMode || this.tcpMode || this.sleMode) return;
       this.handleDeviceDetectFrame(frame);
     });
   }
@@ -328,7 +330,7 @@ export class HomePageBleViewModel {
     this.deviceKind = kind;
     const kindText = this.getDeviceKindText(kind);
     this.searchTip = this.getStringFmt($r('app.string.home_search_tip_detect_success_fmt'), [kindText], `识别成功: ${kindText}`);
-    const mode = (this.staMode || this.tcpMode) ? 'TCP' : 'BLE';
+    const mode = (this.staMode || this.tcpMode) ? 'TCP' : (this.sleMode ? 'SLE' : 'BLE');
     let deviceType = DeviceType.Microwave;
     if (kind === 'FIBER') deviceType = DeviceType.Fiber;
     AppStorage.setOrCreate('GlobalConnectionMode', mode);
@@ -461,7 +463,7 @@ export class HomePageBleViewModel {
       navParams['screenType'] = this.screenType;
       if (deviceType !== undefined) navParams['deviceType'] = deviceType;
       if (deviceKind !== undefined) navParams['deviceKind'] = deviceKind;
-      navParams['connectionMode'] = (this.staMode || this.tcpMode) ? 'TCP' : 'BLE';
+      navParams['connectionMode'] = (this.staMode || this.tcpMode) ? 'TCP' : (this.sleMode ? 'SLE' : 'BLE');
       navParams['deviceName'] = this.selectedDeviceName;
       navParams['deviceAddress'] = this.detectedFiberAddress;
 
@@ -498,6 +500,13 @@ export class HomePageBleViewModel {
 
     this.updateDeviceStatus(item.id, this.getString($r('app.string.device_status_connecting'), '正在连接'));
     this.searchTip = this.getStringFmt($r('app.string.home_search_tip_connecting'), [item.name], `正在连接: ${item.name}`);
+
+    // ⭐ 星闪模式：暂时仅显示扫描结果，连接功能后续开发
+    if (this.sleMode) {
+      this.searchTip = `已选星闪设备: ${item.name}（连接功能开发中，本次仅验证扫描）`;
+      this.updateDeviceStatus(item.id, '已选择');
+      return;
+    }
 
     if (this.staMode || this.tcpMode) {
       const parts = item.id.split(':');
@@ -537,6 +546,13 @@ export class HomePageBleViewModel {
   onSearchButtonClick() {
     if (this.staMode) {
       this.autoFetchTcpList();
+    } else if (this.sleMode) {
+      // ⭐ 星闪模式：扫描 SLE 设备
+      if (this.isSearching) {
+        this.stopSleScan();
+      } else {
+        this.startSleScanWithProgress();
+      }
     } else {
       this.startBleScanWithProgress();
     }
@@ -800,6 +816,68 @@ export class HomePageBleViewModel {
     }
   }
 
+  // ⭐ 星闪 SLE 扫描
+  async startSleScanWithProgress() {
+    if (!this.context) return;
+    const ok = await PermissionUtil.checkAndRequestPermissions(this.context, SLE_PERMISSIONS);
+    if (!ok) {
+      this.searchTip = '星闪权限不足，请在设置中授予 NearLink 和位置权限';
+      return;
+    }
+
+    try { sleScanManager.stopScan(); } catch (e: Error) {}
+    await this.delay(100);
+
+    this.isSearching = true;
+    this.allFoundDevices = [];
+    this.deviceList = [];
+    this.refreshDeviceList();
+    this.searchProgress = 0;
+    this.searchTip = '正在扫描星闪设备...';
+
+    sleScanManager.setOnDeviceFoundCallback((device: SleDevice) => {
+      if (!device.name || device.name.trim().length === 0) return;
+
+      const idx = this.allFoundDevices.findIndex(d => d.id === device.id);
+      if (idx === -1) {
+        let newItem: DeviceInfoView = {
+          id: device.id,
+          name: device.name,
+          address: device.id,
+          status: '未连接',
+          rssi: device.rssi
+        };
+        this.allFoundDevices.push(newItem);
+      } else {
+        this.allFoundDevices[idx].rssi = device.rssi;
+      }
+      this.refreshDeviceList();
+    });
+
+    sleScanManager.startScan();
+
+    this.scanTimer = setInterval(() => {
+      this.searchProgress = Math.min(this.searchProgress + 5, 100);
+      if (this.searchProgress >= 100) {
+        this.stopSleScan();
+      }
+    }, 200);
+  }
+
+  stopSleScan() {
+    try { sleScanManager.stopScan(); } catch (e: Error) {}
+
+    if (this.isSearching) {
+      this.isSearching = false;
+      if (this.scanTimer) {
+        clearInterval(this.scanTimer);
+        this.scanTimer = undefined;
+      }
+      this.searchProgress = 100;
+      this.searchTip = '星闪搜索已停止';
+    }
+  }
+
   async onTcpModeChange(value: boolean) {
     if (value) {
       if (!await this.ensureAuthorized(false)) {
@@ -808,6 +886,7 @@ export class HomePageBleViewModel {
       }
       this.tcpMode = true;
       this.staMode = false;
+      this.sleMode = false;
       this.stopBleScan();
       this.closeTcpListClient();
       this.isFilterBarVisible = false;
@@ -830,6 +909,7 @@ export class HomePageBleViewModel {
       }
       this.staMode = true;
       if (value) this.tcpMode = false;
+      this.sleMode = false;
       this.isFilterBarVisible = false;
       this.filterText = '';
       this.allFoundDevices = [];
@@ -838,6 +918,32 @@ export class HomePageBleViewModel {
       this.searchTip = this.getString($r('app.string.home_connect_mode_sta'), 'STA 模式(网络)');
     } else {
       this.staMode = false;
+    }
+  }
+
+  async onSleModeChange(value: boolean) {
+    if (value) {
+      if (!await this.ensureAuthorized(false)) {
+        this.sleMode = false;
+        return;
+      }
+      this.sleMode = true;
+      this.staMode = false;
+      this.tcpMode = false;
+      this.stopBleScan();
+      this.closeTcpListClient();
+      this.isFilterBarVisible = false;
+      this.filterText = '';
+      this.allFoundDevices = [];
+      this.deviceList = [];
+      this.refreshDeviceList();
+      this.searchTip = '星闪模式 (SLE) — 点击搜索扫描附近星闪设备';
+    } else {
+      this.sleMode = false;
+      this.stopSleScan();
+      this.searchTip = this.getString($r('app.string.home_connect_mode_ble'), '默认模式');
+      this.allFoundDevices = [];
+      this.refreshDeviceList();
     }
   }
 
@@ -920,6 +1026,7 @@ export class HomePageBleViewModel {
 
   onDisappear() {
     this.stopBleScan();
+    this.stopSleScan();
     this.closeTcpListClient();
     TcpTransport.getInstance().offDataReceived(this.LISTENER_KEY);
   }

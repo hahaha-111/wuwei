@@ -37,3 +37,14 @@ export const CAMERA_PERMISSIONS: Permissions[] = [
 export const MIC_PERMISSIONS: Permissions[] = [
   'ohos.permission.MICROPHONE',
 ];
+
+/**
+ * 星闪 (NearLink/SLE) 相关权限集合
+ * - ACCESS_NEARLINK：星闪基础权限（user_grant）
+ * - APPROXIMATELY_LOCATION / LOCATION：扫描星闪设备通常需要定位权限
+ */
+export const SLE_PERMISSIONS: Permissions[] = [
+  'ohos.permission.ACCESS_NEARLINK',
+  'ohos.permission.APPROXIMATELY_LOCATION',
+  'ohos.permission.LOCATION',
+];

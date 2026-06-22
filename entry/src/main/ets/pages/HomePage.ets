@@ -289,7 +289,12 @@ struct HomePage {
         Checkbox({ name: 'tcpMode' }) 
           .select(this.vm.tcpMode)
           .onChange((v) => this.vm.onTcpModeChange(v))
-        Text($r('app.string.label_tcp_mode')).modeLabelText().fontSize(12)
+        Text($r('app.string.label_tcp_mode')).modeLabelText().fontSize(12).margin({ right: 8 })
+
+        Checkbox({ name: 'sleMode' })
+          .select(this.vm.sleMode)
+          .onChange((v) => this.vm.onSleModeChange(v))
+        Text('星闪').modeLabelText().fontSize(12)
       }
       .margin({ top: this.isPhone() ? 4 : 8 })
 

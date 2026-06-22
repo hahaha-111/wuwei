@@ -3,7 +3,7 @@ import { ITransport } from './ITransport';
 import { BleTransport } from './BleTransport';
 import { TcpTransport } from './TcpTransport';
 
-export type TransportMode = 'BLE' | 'TCP';
+export type TransportMode = 'BLE' | 'TCP' | 'SLE';
 
 export class TransportManager {
   private static instance: TransportManager;
