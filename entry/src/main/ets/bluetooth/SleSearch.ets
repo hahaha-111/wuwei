@@ -1,17 +1,13 @@
 // SleSearch.ets   星闪 (NearLink/SLE) 设备搜索
-// 参考 BleSearch.ts 架构，使用 @kit.NearLinkKit 的 nearLink 扫描 API
+// 使用 @kit.NearLinkKit 的 access 扫描 API
 
-import { nearLink } from '@kit.NearLinkKit';
+import { access } from '@kit.NearLinkKit';
 
 const TAG: string = 'SleScanManager';
 
-// ★★★ 星闪广播数据类型常量（SLE AD Type） ★★★
 const SLE_ADV_TYPE_LOCAL_NAME_SHORT = 0x08;
 const SLE_ADV_TYPE_LOCAL_NAME_COMPLETE = 0x09;
 
-/**
- * 提供给 UI 使用的简化星闪设备信息
- */
 export interface SleDevice {
   id: string;
   name: string;
@@ -25,7 +21,7 @@ export class SleScanManager {
     this.deviceFoundCallback = callback;
   }
 
-  onReceiveEvent = (results: Array<nearLink.SleDiscoveryResult>) => {
+  onReceiveEvent = (results: Array<access.SleDiscoveryResult>) => {
     if (!results || results.length === 0) {
       return;
     }
@@ -77,15 +73,15 @@ export class SleScanManager {
   }
 
   public startScan(): void {
-    const scanOptions: nearLink.SleScanOptions = {
+    const scanOptions: access.SleScanOptions = {
       interval: 0,
-      dutyMode: nearLink.SleScanDuty.SLE_SCAN_MODE_LOW_POWER,
-      matchMode: nearLink.SleMatchMode.SLE_MATCH_MODE_AGGRESSIVE
+      dutyMode: access.SleScanDuty.SLE_SCAN_MODE_LOW_POWER,
+      matchMode: access.SleMatchMode.SLE_MATCH_MODE_AGGRESSIVE
     };
 
     try {
-      nearLink.on('SleDeviceFind', this.onReceiveEvent);
-      nearLink.startSleDiscovery(null, scanOptions);
+      access.on('SleDeviceFind', this.onReceiveEvent);
+      access.startSleDiscovery(null, scanOptions);
       console.info(TAG, 'startSleDiscovery success');
     } catch (err) {
       console.error(TAG, 'startScan error: ' + JSON.stringify(err));
@@ -94,8 +90,8 @@ export class SleScanManager {
 
   public stopScan(): void {
     try {
-      nearLink.off('SleDeviceFind', this.onReceiveEvent);
-      nearLink.stopSleDiscovery();
+      access.off('SleDeviceFind', this.onReceiveEvent);
+      access.stopSleDiscovery();
       console.info(TAG, 'stopSleDiscovery success');
     } catch (err) {
       console.error(TAG, 'stopScan error: ' + JSON.stringify(err));
