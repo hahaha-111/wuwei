@@ -29,6 +29,7 @@ import { i18n } from '@kit.LocalizationKit';
 
 import { LogManager } from '../common/database/LogManager';
 import { LogCategory } from '../common/database/LogEntity';
+import { AppConfig } from '../common/AppConfig';
 
 type Resource = resourceManager.Resource;
 
@@ -92,8 +93,10 @@ export class HomePageBleViewModel {
     { value: '日本語', icon: $r('app.media.icon_foreground') }
   ];
 
-  tcpIp: string = '43.138.24.214';
-  tcpPort: string = '10000';
+ 
+  tcpIp: string = AppConfig.SERVER_HOST; 
+    // 修复2：使用 .toString() 将 number 转换为 string
+    tcpPort: string = AppConfig.ALARM_SERVER_PORT.toString();
   showTcpDialog: boolean = false;
   tcpListConnected: boolean = false;
 
@@ -545,12 +548,12 @@ export class HomePageBleViewModel {
     this.isSearching = true; 
     this.searchTip = '正在连接服务器请求报警分析数据...';
 
-    const ip = this.tcpIp;
-    const port = parseInt(this.tcpPort);
+    const ip = AppConfig.SERVER_HOST;
+    const port = AppConfig.ALARM_SERVER_PORT
 
     this.closeTcpListClient(); 
-    this.tcpListClient = new TcpClient({ host: ip, port: port, timeout: 5000 });
-
+   // this.tcpListClient = new TcpClient({ host: ip, port: port, timeout: 5000 });
+   this.tcpListClient = new TcpClient({ host: ip, port: port, timeout: 5000 });
     this.receiveBuffer = '';
     if (this.receiveTimer) {
       clearTimeout(this.receiveTimer);
@@ -644,8 +647,8 @@ export class HomePageBleViewModel {
   }
 
   private async autoFetchTcpList() {
-    const ip = '43.138.24.214';
-    const port = 10000;
+    const ip = AppConfig.SERVER_HOST
+    const port = AppConfig.ALARM_SERVER_PORT
 
     this.closeTcpListClient();
     this.isSearching = true;

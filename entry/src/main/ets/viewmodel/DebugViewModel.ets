@@ -13,6 +13,7 @@ import { PermissionUtil } from '../utils/PermissionUtil';
 import { BLE_PERMISSIONS } from '../utils/PermissionsConfig';
 import { ProtocolFrame, ProtocolParser, DeviceType } from '../common/ProtocolParser';
 import { ProtocolDecoder } from '../common/ProtocolDecoder';
+import { AppConfig } from '../common/AppConfig';
 import {
   DecodedCommand,
   CommandPayload,
@@ -72,8 +73,9 @@ export class DebugViewModel {
   selectedWriteUuid: string = '';
   selectedNotifyUuid: string = '';
   currentServiceUuid: string = '';
-  tcpHost: string = '43.138.24.214';
-  tcpPortText: string = '10000';
+  tcpHost: string = AppConfig.SERVER_HOST; 
+
+  tcpPortText: string = AppConfig.ALARM_SERVER_PORT.toString();
   tcpConnectStateText: string = '未连接';
   tcpConnected: boolean = false;
   bleReceiveHex: string = '';

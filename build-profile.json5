@@ -4,13 +4,13 @@
       {
         "name": "default",
         "material": {
-          "storePassword": "00000019A982D856A1E1BCF0A169D8B67B873C3F6DBE6F4CB688F6665B63ADCFEA0CB2367B12EDECBD",
-          "certpath": "/storage/Users/currentUser/Documents/HuaweiKey/wuwei/无畏.cer",
-          "keyAlias": "wuwei",
-          "keyPassword": "00000019A982D856A1E1BCF0A169D8B67B873C3F6DBE6F4CB688F6665B63ADCFEA0CB2367B12EDECBD",
-          "profile": "/storage/Users/currentUser/Documents/HuaweiKey/wuwei/无畏Release.p7b",
+          "storePassword": "0000002029C6D194CBF4D2C74B15467A20F964553109B776B439694B03A379FB1FC2E5064A3AB2BE216CFDBC8771C4D7",
+          "certpath": "/storage/Users/currentUser/appdata/el2/base/com.huawei.devecostudio/files/ohos/config/default_wuwei3XCmjCMIoqafLQmdKhNUZ_clIFpV_tcoBdKw-oP4duc.cer",
+          "keyAlias": "debugKey",
+          "keyPassword": "0000002029C6D194CBF4D2C74B15467A20F964553109B776B439694B03A379FB1FC2E5064A3AB2BE216CFDBC8771C4D7",
+          "profile": "/storage/Users/currentUser/appdata/el2/base/com.huawei.devecostudio/files/ohos/config/default_wuwei3XCmjCMIoqafLQmdKhNUZ_clIFpV_tcoBdKw-oP4duc.p7b",
           "signAlg": "SHA256withECDSA",
-          "storeFile": "/storage/Users/currentUser/Documents/HuaweiKey/wuwei/wuwei.p12"
+          "storeFile": "/storage/Users/currentUser/appdata/el2/base/com.huawei.devecostudio/files/ohos/config/default_wuwei3XCmjCMIoqafLQmdKhNUZ_clIFpV_tcoBdKw-oP4duc.p12"
         },
         "type": "HarmonyOS"
       }

@@ -11,6 +11,9 @@ import { TcpTransport } from '../common/transport/TcpTransport';
 import { ProtocolParser, ProtocolFrame } from '../common/ProtocolParser';
 import { FileUtil } from '../common/utils/FileUtil';
 
+// ⭐ 引入全局配置文件
+import { AppConfig } from '../common/AppConfig';
+
 export interface AlarmRowData {
   port: string;
   items: string[];
@@ -31,8 +34,9 @@ export class AlarmAnalysisViewModel {
   loadStatusText: string = '正在加载数据...';
   isUpdating: boolean = false; // 控制页面刷新读取等待态
   
-  private readonly SERVER_IP: string = '43.138.24.214';
-  private readonly SERVER_PORT: number = 10000;
+  // ⭐ 修改：使用公用变量替换硬编码的 IP 和端口
+  private readonly SERVER_IP: string = AppConfig.SERVER_HOST;
+  private readonly SERVER_PORT: number = AppConfig.ALARM_SERVER_PORT;
 
   private localParser: ProtocolParser = new ProtocolParser();
   private readonly LISTENER_KEY = 'AlarmAnalysisVM';
