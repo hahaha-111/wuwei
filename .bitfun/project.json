@@ -4,7 +4,7 @@
   "projectType": "hvigor",
   "uri": {
     "$type": 1,
-    "data": "file:///storage/Users/currentUser/Documents/HUAWEI-Project/wuwei"
+    "data": "file:///storage/Users/currentUser/Documents/HUAWEI-Project/wuwei2"
   },
   "buildTask": "",
   "extendConfigs": {
@@ -18,7 +18,7 @@
       "projectType": "hvigor",
       "uri": {
         "$type": 1,
-        "data": "file:///storage/Users/currentUser/Documents/HUAWEI-Project/wuwei/entry"
+        "data": "file:///storage/Users/currentUser/Documents/HUAWEI-Project/wuwei2/entry"
       },
       "buildTask": "",
       "extendConfigs": {
@@ -44,13 +44,13 @@
         {
           "url": {
             "$type": 1,
-            "data": "file:///storage/Users/currentUser/Documents/HUAWEI-Project/wuwei/entry/src/main/ets"
+            "data": "file:///storage/Users/currentUser/Documents/HUAWEI-Project/wuwei2/entry/src/main/ets"
           }
         },
         {
           "url": {
             "$type": 1,
-            "data": "file:///storage/Users/currentUser/Documents/HUAWEI-Project/wuwei/entry/src/ohosTest/ets"
+            "data": "file:///storage/Users/currentUser/Documents/HUAWEI-Project/wuwei2/entry/src/ohosTest/ets"
           }
         }
       ],
@@ -61,37 +61,37 @@
         {
           "url": {
             "$type": 1,
-            "data": "file:///storage/Users/currentUser/Documents/HUAWEI-Project/wuwei/oh_modules"
+            "data": "file:///storage/Users/currentUser/Documents/HUAWEI-Project/wuwei2/oh_modules"
           }
         },
         {
           "url": {
             "$type": 1,
-            "data": "file:///storage/Users/currentUser/Documents/HUAWEI-Project/wuwei/.hvigor"
+            "data": "file:///storage/Users/currentUser/Documents/HUAWEI-Project/wuwei2/.hvigor"
           }
         },
         {
           "url": {
             "$type": 1,
-            "data": "file:///storage/Users/currentUser/Documents/HUAWEI-Project/wuwei/build"
+            "data": "file:///storage/Users/currentUser/Documents/HUAWEI-Project/wuwei2/build"
           }
         },
         {
           "url": {
             "$type": 1,
-            "data": "file:///storage/Users/currentUser/Documents/HUAWEI-Project/wuwei/entry/.test"
+            "data": "file:///storage/Users/currentUser/Documents/HUAWEI-Project/wuwei2/entry/.test"
           }
         },
         {
           "url": {
             "$type": 1,
-            "data": "file:///storage/Users/currentUser/Documents/HUAWEI-Project/wuwei/entry/oh_modules"
+            "data": "file:///storage/Users/currentUser/Documents/HUAWEI-Project/wuwei2/entry/oh_modules"
           }
         },
         {
           "url": {
             "$type": 1,
-            "data": "file:///storage/Users/currentUser/Documents/HUAWEI-Project/wuwei/entry/build"
+            "data": "file:///storage/Users/currentUser/Documents/HUAWEI-Project/wuwei2/entry/build"
           }
         }
       ]
