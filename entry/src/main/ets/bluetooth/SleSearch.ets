@@ -1,23 +1,13 @@
 // SleSearch.ets   星闪 (NearLink/SLE) 设备搜索
-// 参考 BleSearch.ts 架构，使用 @kit.NearLinkKit 的 sle 扫描 API
+// 参考 BleSearch.ts 架构，使用 @kit.NearLinkKit 的 nearLink 扫描 API
 
-import { sle } from '@kit.NearLinkKit';
-import { BusinessError } from '@ohos.base';
+import { nearLink } from '@kit.NearLinkKit';
 
 const TAG: string = 'SleScanManager';
 
 // ★★★ 星闪广播数据类型常量（SLE AD Type） ★★★
-const SLE_ADV_TYPE_FLAG = 0x01;
-const SLE_ADV_TYPE_16_BIT_SERVICE_UUIDS_INCOMPLETE = 0x02;
-const SLE_ADV_TYPE_16_BIT_SERVICE_UUIDS_COMPLETE = 0x03;
-const SLE_ADV_TYPE_32_BIT_SERVICE_UUIDS_INCOMPLETE = 0x04;
-const SLE_ADV_TYPE_32_BIT_SERVICE_UUIDS_COMPLETE = 0x05;
-const SLE_ADV_TYPE_128_BIT_SERVICE_UUIDS_INCOMPLETE = 0x06;
-const SLE_ADV_TYPE_128_BIT_SERVICE_UUIDS_COMPLETE = 0x07;
 const SLE_ADV_TYPE_LOCAL_NAME_SHORT = 0x08;
 const SLE_ADV_TYPE_LOCAL_NAME_COMPLETE = 0x09;
-const SLE_ADV_TYPE_TX_POWER_LEVEL = 0x0A;
-const SLE_ADV_TYPE_MANUFACTURER_SPECIFIC_DATA = 0xFF;
 
 /**
  * 提供给 UI 使用的简化星闪设备信息
@@ -35,7 +25,7 @@ export class SleScanManager {
     this.deviceFoundCallback = callback;
   }
 
-  onReceiveEvent = (results: Array<sle.SleDiscoveryResult>) => {
+  onReceiveEvent = (results: Array<nearLink.SleDiscoveryResult>) => {
     if (!results || results.length === 0) {
       return;
     }
@@ -87,30 +77,28 @@ export class SleScanManager {
   }
 
   public startScan(): void {
-    const scanOptions: sle.SleScanOptions = {
+    const scanOptions: nearLink.SleScanOptions = {
       interval: 0,
-      dutyMode: sle.SleScanDuty.SLE_SCAN_MODE_LOW_POWER,
-      matchMode: sle.SleMatchMode.SLE_MATCH_MODE_AGGRESSIVE
+      dutyMode: nearLink.SleScanDuty.SLE_SCAN_MODE_LOW_POWER,
+      matchMode: nearLink.SleMatchMode.SLE_MATCH_MODE_AGGRESSIVE
     };
 
     try {
-      sle.on('SleDeviceFind', this.onReceiveEvent);
-      sle.startSleDiscovery(null, scanOptions);
+      nearLink.on('SleDeviceFind', this.onReceiveEvent);
+      nearLink.startSleDiscovery(null, scanOptions);
       console.info(TAG, 'startSleDiscovery success');
-    } catch (err: Error) {
-      const e = err as BusinessError;
-      console.error(TAG, 'startScan error: ' + e.message);
+    } catch (err) {
+      console.error(TAG, 'startScan error: ' + JSON.stringify(err));
     }
   }
 
   public stopScan(): void {
     try {
-      sle.off('SleDeviceFind', this.onReceiveEvent);
-      sle.stopSleDiscovery();
+      nearLink.off('SleDeviceFind', this.onReceiveEvent);
+      nearLink.stopSleDiscovery();
       console.info(TAG, 'stopSleDiscovery success');
-    } catch (err: Error) {
-      const e = err as BusinessError;
-      console.error(TAG, 'stopScan error: ' + e.message);
+    } catch (err) {
+      console.error(TAG, 'stopScan error: ' + JSON.stringify(err));
     }
   }
 }

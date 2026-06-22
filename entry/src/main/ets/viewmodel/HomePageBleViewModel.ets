@@ -825,7 +825,7 @@ export class HomePageBleViewModel {
       return;
     }
 
-    try { sleScanManager.stopScan(); } catch (e: Error) {}
+    try { sleScanManager.stopScan(); } catch (e) {}
     await this.delay(100);
 
     this.isSearching = true;
@@ -865,7 +865,7 @@ export class HomePageBleViewModel {
   }
 
   stopSleScan() {
-    try { sleScanManager.stopScan(); } catch (e: Error) {}
+    try { sleScanManager.stopScan(); } catch (e) {}
 
     if (this.isSearching) {
       this.isSearching = false;
