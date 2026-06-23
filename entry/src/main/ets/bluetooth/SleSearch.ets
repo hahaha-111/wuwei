@@ -76,19 +76,21 @@ export class SleScanManager {
   }
 
   public startScan(): void {
+    // 扫描所有星闪设备：使用空白过滤器
+    const scanFilter: scan.ScanFilters = {};
     const scanOptions: scan.ScanOptions = {
       scanMode: scan.ScanMode.SCAN_MODE_LOW_POWER
     };
 
     try {
       scan.on('deviceFound', this.onReceiveEvent);
-      scan.startScan([], scanOptions).then(() => {
+      scan.startScan([scanFilter], scanOptions).then(() => {
         console.info(TAG, 'startScan success');
       }).catch((err: BusinessError) => {
-        console.error(TAG, 'startScan error: ' + err.message);
+        console.error(TAG, 'startScan rejected: ' + err.code + ' ' + err.message);
       });
     } catch (err) {
-      console.error(TAG, 'startScan error: ' + ((err as BusinessError).message));
+      console.error(TAG, 'startScan exception: ' + ((err as BusinessError).message));
     }
   }
 
