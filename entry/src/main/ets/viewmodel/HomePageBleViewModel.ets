@@ -819,6 +819,13 @@ export class HomePageBleViewModel {
   // ⭐ 星闪 SLE 扫描
   async startSleScanWithProgress() {
     if (!this.context) return;
+
+    // 检查设备是否支持星闪
+    if (!sleScanManager.isNearLinkSupported()) {
+      this.searchTip = '当前设备不支持星闪（NearLink）';
+      return;
+    }
+
     const ok = await PermissionUtil.checkAndRequestPermissions(this.context, SLE_PERMISSIONS);
     if (!ok) {
       this.searchTip = '星闪权限不足，请在设置中授予 NearLink 和位置权限';
