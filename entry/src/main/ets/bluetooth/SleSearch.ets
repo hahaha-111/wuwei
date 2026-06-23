@@ -24,9 +24,6 @@ export class SleScanManager {
     this.deviceFoundCallback = callback;
   }
 
-  /**
-   * 检查当前设备是否支持星闪
-   */
   public isNearLinkSupported(): boolean {
     try {
       return manager.isNearLinkSupported();
@@ -85,9 +82,11 @@ export class SleScanManager {
 
     return localName;
   }
-
   public startScan(): void {
-    // 1. 检查设备是否支持星闪
+    // ── 目标设备 ──
+    const TARGET_DEVICE_NAMES: string[] = ['CM919', 'Pura 70 Pro'];
+
+    // 1. 检查设备支持
     let supported: boolean = false;
     try {
       supported = manager.isNearLinkSupported();
@@ -96,11 +95,10 @@ export class SleScanManager {
     }
     console.info(TAG, 'NearLink supported: ' + supported);
     if (!supported) {
-      console.error(TAG, 'Device does NOT support NearLink, scan aborted');
       return;
     }
 
-    // 2. 检查星闪开关状态
+    // 2. 星闪状态
     try {
       let state = manager.getState();
       console.info(TAG, 'NearLink state: ' + JSON.stringify(state));
@@ -108,29 +106,41 @@ export class SleScanManager {
       console.error(TAG, 'getState failed: ' + ((err as BusinessError).message));
     }
 
-    // 3. 构造扫描参数
-    // 过滤器至少需要一个条件，空字符串作为通配（匹配任意设备名）
-    const scanFilter: scan.ScanFilters = {
-      deviceName: ''  // 空字符串 = 扫描所有设备
-    };
+    // 3. 注册回调
+    try {
+      scan.on('deviceFound', this.onReceiveEvent);
+      console.info(TAG, 'scan.on OK');
+    } catch (err) {
+      console.error(TAG, 'scan.on FAILED: ' + ((err as BusinessError).message));
+      return;
+    }
+
+    // 4. 构建过滤器（多组 = OR 关系，每组至少一个有效条件）
+    const filters: scan.ScanFilters[] = [];
+    for (const name of TARGET_DEVICE_NAMES) {
+      if (name && name.length > 0) {
+        filters.push({ deviceName: name } as scan.ScanFilters);
+      }
+    }
+    console.info(TAG, 'filters: ' + JSON.stringify(filters));
+
+    // 5. 扫描选项
     const scanOptions: scan.ScanOptions = {
       scanMode: scan.ScanMode.SCAN_MODE_LOW_POWER
     };
 
-    // 4. 开始扫描
+    // 6. 启动扫描
     try {
-      scan.on('deviceFound', this.onReceiveEvent);
-      scan.startScan([scanFilter], scanOptions).then(() => {
-        console.info(TAG, 'startScan success');
+      scan.startScan(filters, scanOptions).then(() => {
+        console.info(TAG, '✅ startScan OK — 等待设备...');
       }).catch((err: BusinessError) => {
-        console.error(TAG, 'startScan rejected: code=' + err.code + ' msg=' + err.message);
+        console.error(TAG, '❌ startScan rejected: code=' + err.code + ' msg=' + err.message);
       });
     } catch (err) {
-      console.error(TAG, 'startScan exception: code=' + (err as BusinessError).code +
+      console.error(TAG, '❌ startScan sync FAILED: code=' + (err as BusinessError).code +
         ' msg=' + (err as BusinessError).message);
     }
   }
-
   public stopScan(): void {
     try {
       scan.off('deviceFound', this.onReceiveEvent);

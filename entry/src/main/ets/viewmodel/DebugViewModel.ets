@@ -390,31 +390,50 @@ export class DebugViewModel {
   }
 
   public async pickFileAndStartOTA(context: common.UIAbilityContext): Promise<void> {
-    if ((this.activeChannel === 'BLE' && !this.connectedDeviceId) || (this.activeChannel === 'TCP' && !this.tcpConnected)) {
-      this.message = '请先连接设备';
-      return;
-    }
-
-    try {
-      const documentPicker = new picker.DocumentViewPicker(context);
-      const uriList = await documentPicker.select({ maxSelectNumber: 1 });
-      if (uriList.length > 0) {
-        const uri = uriList[0];
-        if (uri.endsWith('.hex')) {
-          this.message = '警告：.hex 文件可能无法直接使用，建议使用 .bin';
-        }
-
-        this.otaController.packetSize = this.otaPacketSize;
-        this.otaController.delayMs = this.otaDelayMs;
-
-        this.isOtaLoading = true;
-        await this.otaController.start(uri);
+      if ((this.activeChannel === 'BLE' && !this.connectedDeviceId) || (this.activeChannel === 'TCP' && !this.tcpConnected)) {
+        this.message = '请先连接设备';
+        return;
       }
-    } catch (err) {
-      console.error('File pick failed', JSON.stringify(err));
-    }
-  }
 
+      try {
+        const documentPicker = new picker.DocumentViewPicker(context);
+        const uriList = await documentPicker.select({ maxSelectNumber: 1 });
+        if (uriList.length > 0) {
+          const uri = uriList[0];
+
+          // ================== 【硬编码测试：强行指定 02地址 66设备】 ==================
+          this.message = '发送硬编码跳转指令 (FF 02 66 01 74 DB)...';
+        
+          // 这里的 Uint8Array 就是纯粹的 HEX/二进制 格式流
+          const jumpCmd = new Uint8Array([0xFF, 0x02, 0x66, 0x01, 0x74, 0xDB]); 
+        
+          if (this.activeChannel === 'BLE') {
+            // 蓝牙通道直接发送 HEX 字节流
+            gattClientManager.writeBytes(jumpCmd);
+          } else {
+            // TCP 通道转成 HEX 字符串发送 (FF02660174DB)
+            const hex = ProtocolParser.bytesToHexString(jumpCmd).replace(/\s+/g, '');
+            TcpTransport.getInstance().sendHexString(hex);
+          }
+        
+          // 强制等待 1.5 秒，给单片机执行 IAP_CONTR=0x28 留出时间
+          await new Promise<void>((resolve) => {
+            setTimeout(() => { resolve(); }, 1500);
+          });
+          // =========================================================================
+
+          this.otaController.packetSize = this.otaPacketSize;
+          this.otaController.delayMs = this.otaDelayMs;
+
+          this.isOtaLoading = true;
+          // 启动 OTA 流程（内部会自动发送 0xA0 握手）
+          await this.otaController.start(uri); 
+        }
+      } catch (err) {
+        console.error('File pick failed', JSON.stringify(err));
+      }
+    }
+  
   public getCurrentRecvTextRaw(): string {
     return this.activeChannel === 'BLE' ? this.bleReceiveText : this.tcpReceiveText;
   }
@@ -575,6 +594,10 @@ export class DebugViewModel {
     });
 
     gattClientManager.setOnFrameReceived((frame: ProtocolFrame) => {
+      // ⭐ 新增：自动记录当前正在通信的设备的真实地址和类型
+      // 这样一来，无论是连上了 66 还是 C9，OTA 跳转指令都会精准匹配！
+      this.currentDeviceAddress = frame.address;
+      this.currentDeviceType = frame.deviceType;
       const now = this.getCurrentTimeString();
       const rawHex = ProtocolParser.bytesToHexString(frame.raw);
       const dataHex = ProtocolParser.bytesToHexString(frame.data);
