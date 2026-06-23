@@ -1,12 +1,15 @@
-// SleSearch.ets   星闪 (NearLink/SLE) 设备搜索
-// 使用 @kit.NearLinkKit 的 access 扫描 API
+// SleSearch.ets   星闪 (NearLink/SLE) 设备扫描
+// 官方文档: import { scan } from '@kit.NearLinkKit'
 
-import { access } from '@kit.NearLinkKit';
+import { scan } from '@kit.NearLinkKit';
+import { BusinessError } from '@kit.BasicServicesKit';
+import { util } from '@kit.ArkTS';
 
 const TAG: string = 'SleScanManager';
 
-const SLE_ADV_TYPE_LOCAL_NAME_SHORT = 0x08;
-const SLE_ADV_TYPE_LOCAL_NAME_COMPLETE = 0x09;
+// 星闪广播数据类型常量
+const SLE_ADV_DATA_TYPE_SHORTENED_LOCAL_NAME = 0x0A;
+const SLE_ADV_DATA_TYPE_COMPLETE_LOCAL_NAME = 0x0B;
 
 export interface SleDevice {
   id: string;
@@ -21,21 +24,21 @@ export class SleScanManager {
     this.deviceFoundCallback = callback;
   }
 
-  onReceiveEvent = (results: Array<access.SleDiscoveryResult>) => {
-    if (!results || results.length === 0) {
+  onReceiveEvent = (data: Array<scan.ScanResults>) => {
+    if (!data || data.length === 0) {
       return;
     }
 
-    for (const result of results) {
+    for (const result of data) {
       const localNameFromAdv: string = this.parseAdvData(result.data);
       const name: string = (result.deviceName && result.deviceName.length > 0)
         ? result.deviceName
         : localNameFromAdv;
 
       const device: SleDevice = {
-        id: result.deviceId,
+        id: result.address,
         name: name,
-        rssi: result.rssi
+        rssi: result.rssi ?? -100
       };
 
       if (this.deviceFoundCallback) {
@@ -53,17 +56,17 @@ export class SleScanManager {
     let localName: string = '';
     let curPos = 0;
     while (curPos < advData.byteLength) {
-      const length = advData[curPos++];
-      if (length === 0) {
+      const advDataType = advData[curPos++];
+      const advDataLength = advData[curPos++];
+      if (advDataLength === 0) {
         break;
       }
 
-      const advDataLength = length - 1;
-      const advDataType = advData[curPos++];
-
-      if (advDataType === SLE_ADV_TYPE_LOCAL_NAME_SHORT ||
-          advDataType === SLE_ADV_TYPE_LOCAL_NAME_COMPLETE) {
-        localName = advData.slice(curPos, curPos + advDataLength).toString();
+      if (advDataType === SLE_ADV_DATA_TYPE_SHORTENED_LOCAL_NAME ||
+          advDataType === SLE_ADV_DATA_TYPE_COMPLETE_LOCAL_NAME) {
+        const nameSlice = advData.slice(curPos, curPos + advDataLength);
+        const decoder = util.TextDecoder.create('utf-8');
+        localName = decoder.decodeToString(new Uint8Array(nameSlice));
         break;
       }
       curPos += advDataLength;
@@ -73,28 +76,32 @@ export class SleScanManager {
   }
 
   public startScan(): void {
-    const scanOptions: access.SleScanOptions = {
-      interval: 0,
-      dutyMode: access.SleScanDuty.SLE_SCAN_MODE_LOW_POWER,
-      matchMode: access.SleMatchMode.SLE_MATCH_MODE_AGGRESSIVE
+    const scanOptions: scan.ScanOptions = {
+      scanMode: scan.ScanMode.SCAN_MODE_LOW_POWER
     };
 
     try {
-      access.on('SleDeviceFind', this.onReceiveEvent);
-      access.startSleDiscovery(null, scanOptions);
-      console.info(TAG, 'startSleDiscovery success');
+      scan.on('deviceFound', this.onReceiveEvent);
+      scan.startScan([], scanOptions).then(() => {
+        console.info(TAG, 'startScan success');
+      }).catch((err: BusinessError) => {
+        console.error(TAG, 'startScan error: ' + err.message);
+      });
     } catch (err) {
-      console.error(TAG, 'startScan error: ' + JSON.stringify(err));
+      console.error(TAG, 'startScan error: ' + ((err as BusinessError).message));
     }
   }
 
   public stopScan(): void {
     try {
-      access.off('SleDeviceFind', this.onReceiveEvent);
-      access.stopSleDiscovery();
-      console.info(TAG, 'stopSleDiscovery success');
+      scan.off('deviceFound', this.onReceiveEvent);
+      scan.stopScan().then(() => {
+        console.info(TAG, 'stopScan success');
+      }).catch((err: BusinessError) => {
+        console.error(TAG, 'stopScan error: ' + err.message);
+      });
     } catch (err) {
-      console.error(TAG, 'stopScan error: ' + JSON.stringify(err));
+      console.error(TAG, 'stopScan error: ' + ((err as BusinessError).message));
     }
   }
 }
